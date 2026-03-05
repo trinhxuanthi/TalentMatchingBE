@@ -2,8 +2,7 @@
 FROM maven:3.8.4-openjdk-17 AS build
 WORKDIR /app
 COPY . .
-RUN mvn clean package -DskipTests
-
+RUN mvn clean package -DskipTests -Dmaven.resources.skip=true
 # Bước 2: Chạy ứng dụng (ĐÃ SỬA DÒNG NÀY)
 FROM eclipse-temurin:17-jdk-alpine
 WORKDIR /app
