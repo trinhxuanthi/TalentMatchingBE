@@ -8,6 +8,12 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -21,13 +27,13 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                // Lưu ý: Nếu Frontend bị lỗi CORS, hãy thay bằng cấu hình cụ thể thay vì disable
-                .cors(cors -> cors.disable())
+                // Cấu hình CORS cơ bản để Frontend có thể gọi API
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        // 1. Cho phép tất cả các API Auth
+                        // 1. Mở cửa hoàn toàn cho Auth API
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        // 2. Cho phép toàn bộ tài liệu Swagger (Gộp gọn để tránh thiếu sót)
+                        // 2. Mở cửa cho toàn bộ tài liệu Swagger (Dành cho bản 3.0.2)
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/v3/api-docs.yaml",
@@ -35,24 +41,38 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/swagger-ui/index.html",
                                 "/webjars/**",
-                                "/swagger-resources/**"
+                                "/swagger-resources/**",
+                                "/configuration/ui",
+                                "/configuration/security"
                         ).permitAll()
 
-                        // 3. Cho phép các đường dẫn hệ thống cơ bản
+                        // 3. Cho phép các đường dẫn hệ thống và favicon
                         .requestMatchers("/", "/error", "/favicon.ico").permitAll()
 
-                        // 4. Mọi request khác đều phải có Token hợp lệ
+                        // 4. Các yêu cầu còn lại bắt buộc phải có Token
                         .anyRequest().authenticated()
                 )
-                // Kích hoạt đăng nhập Google
+                // Cấu hình OAuth2 Login (Google)
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(oauth2SuccessHandler)
                 )
-                // Cấu hình không lưu session (Stateless) cho JWT
+                // Chế độ Stateless (Không lưu session) cho JWT
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // Thêm Filter kiểm tra JWT trước filter xác thực mặc định
+                // Kiểm tra Token trước khi thực hiện xác thực
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    // Cấu hình CORS để Frontend (ví dụ localhost:3000) không bị lỗi chặn truy cập
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of("*")); // Cho phép tất cả các nguồn (có thể sửa thành domain FE sau)
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }
