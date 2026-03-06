@@ -21,30 +21,36 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
+                // Lưu ý: Nếu Frontend bị lỗi CORS, hãy thay bằng cấu hình cụ thể thay vì disable
                 .cors(cors -> cors.disable())
                 .authorizeHttpRequests(auth -> auth
+                        // 1. Cho phép tất cả các API Auth
                         .requestMatchers("/api/auth/**").permitAll()
+
+                        // 2. Cho phép toàn bộ tài liệu Swagger (Gộp gọn để tránh thiếu sót)
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/v3/api-docs.yaml",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
+                                "/swagger-ui/index.html",
                                 "/webjars/**",
-                                "/swagger-resources/**",
-                                "/configuration/ui",
-                                "/configuration/security",
-                                "/swagger-ui/index.html"
+                                "/swagger-resources/**"
                         ).permitAll()
-                        .requestMatchers("/", "/error").permitAll()
 
-                        // Mọi request khác đều phải có Token hợp lệ
+                        // 3. Cho phép các đường dẫn hệ thống cơ bản
+                        .requestMatchers("/", "/error", "/favicon.ico").permitAll()
+
+                        // 4. Mọi request khác đều phải có Token hợp lệ
                         .anyRequest().authenticated()
                 )
                 // Kích hoạt đăng nhập Google
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(oauth2SuccessHandler)
                 )
+                // Cấu hình không lưu session (Stateless) cho JWT
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // Thêm Filter kiểm tra JWT trước filter xác thực mặc định
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
