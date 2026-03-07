@@ -4,7 +4,7 @@ WORKDIR /app
 COPY . .
 
 # XÓA BỎ tham số -Dmaven.resources.skip=true để nạp cấu hình
-RUN mvn clean package -DskipTests
+RUN mvn clean package -DskipTests -U
 
 # Bước 2: Chạy ứng dụng
 FROM eclipse-temurin:17-jdk-alpine
