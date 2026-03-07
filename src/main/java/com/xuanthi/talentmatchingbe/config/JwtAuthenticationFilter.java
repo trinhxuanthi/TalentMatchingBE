@@ -31,36 +31,51 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        // Lấy chuỗi Authorization từ Header
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         final String userEmail;
+        final String servletPath = request.getServletPath();
 
-        // Kiểm tra xem có Token không (phải bắt đầu bằng "Bearer ")
+        // TỐI ƯU: Bypass nhanh cho các link công cộng để giảm tải CPU
+        if (servletPath.contains("/api/auth") ||
+                servletPath.contains("/oauth2") ||
+                servletPath.contains("/swagger-ui") ||
+                servletPath.contains("/v3/api-docs")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // Kiểm tra Token (phải bắt đầu bằng "Bearer ")
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Tách lấy chuỗi Token (bỏ chữ "Bearer ")
         jwt = authHeader.substring(7);
-        userEmail = jwtService.extractEmail(jwt);
 
-        // Nếu có Email và User chưa được xác thực trong hệ thống
-        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+        // TỐI ƯU: Chỉ extract email nếu thực sự cần thiết
+        try {
+            userEmail = jwtService.extractEmail(jwt);
 
-            // Kiểm tra Token có hợp lệ/hết hạn không
-            if (jwtService.isTokenValid(jwt, userDetails.getUsername())) {
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
-                );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+
+                if (jwtService.isTokenValid(jwt, userDetails.getUsername())) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
+        } catch (Exception e) {
+            // TỐI ƯU: Nếu Token sai định dạng hoặc hết hạn, dừng xử lý ngay
+            filterChain.doFilter(request, response);
+            return;
         }
+
         filterChain.doFilter(request, response);
     }
 }

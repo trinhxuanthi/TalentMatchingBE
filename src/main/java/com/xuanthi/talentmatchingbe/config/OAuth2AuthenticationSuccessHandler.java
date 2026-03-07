@@ -1,6 +1,5 @@
 package com.xuanthi.talentmatchingbe.config;
 
-import com.xuanthi.talentmatchingbe.enums.Role;
 import com.xuanthi.talentmatchingbe.entity.User;
 import com.xuanthi.talentmatchingbe.repository.UserRepository;
 import com.xuanthi.talentmatchingbe.service.JwtService;
@@ -15,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -30,26 +30,22 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                         Authentication authentication) throws IOException {
 
-        // 1. Lấy thông tin từ Google
-        OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
-        String email = oAuth2User.getAttribute("email");
-        String name = oAuth2User.getAttribute("name");
+        OAuth2User oauth2User = (OAuth2User) authentication.getPrincipal();
 
-        // 2. Tìm hoặc Tạo mới User (Vì chỉ dùng Google nên password để trống)
-        User user = userRepository.findByEmail(email)
+        // Lấy email từ Google/Facebook
+        String email = Optional.ofNullable(oauth2User.<String>getAttribute("email"))
+                .orElse(oauth2User.getAttribute("id"));
+
+        // 2. TỐI ƯU: Tìm User từ Database để khớp với yêu cầu của JwtServic
+        com.xuanthi.talentmatchingbe.entity.User user = userRepository.findByEmail(email)
                 .orElseGet(() -> {
-                    User newUser = User.builder()
-                            .email(email)
-                            .fullName(name)
-                            .role(Role.CANDIDATE) // Mặc định là ứng viên
-                            .build();
+                    // Nếu chưa có user thì tạo mới (Logic đăng ký nhanh)
+                    User newUser = new User();
+                    newUser.setEmail(email);
+                    newUser.setFullName(oauth2User.getAttribute("name"));
                     return userRepository.save(newUser);
                 });
-
-        // 3. Tạo JWT Token của hệ thống mình
         String token = jwtService.generateToken(user);
-
-        // 4. Redirect về Frontend kèm Token trên URL
         String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
                 .queryParam("token", token)
                 .build().toUriString();

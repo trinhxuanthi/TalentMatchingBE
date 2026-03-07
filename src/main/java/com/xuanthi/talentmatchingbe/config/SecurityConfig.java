@@ -27,50 +27,52 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                // Cấu hình CORS cơ bản để Frontend có thể gọi API
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        // 1. Mở cửa hoàn toàn cho Auth API
-                        .requestMatchers("/api/auth/**").permitAll()
+                        // Mở cửa cho Auth API và các luồng OAuth2
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/login/**",
+                                "/oauth2/**",
+                                "/auth/**"
+                        ).permitAll()
 
-                        // 2. Mở cửa cho toàn bộ tài liệu Swagger (Dành cho bản 3.0.2)
+                        // Mở cửa cho toàn bộ tài liệu Swagger (Dành cho bản 3.0.2)
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/v3/api-docs.yaml",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/swagger-ui/index.html",
                                 "/webjars/**",
-                                "/swagger-resources/**",
-                                "/configuration/ui",
-                                "/configuration/security"
+                                "/swagger-resources/**"
                         ).permitAll()
 
-                        // 3. Cho phép các đường dẫn hệ thống và favicon
+                        // Cho phép các đường dẫn hệ thống
                         .requestMatchers("/", "/error", "/favicon.ico").permitAll()
 
-                        // 4. Các yêu cầu còn lại bắt buộc phải có Token
+                        // ác yêu cầu còn lại bắt buộc phải có Token
                         .anyRequest().authenticated()
                 )
-                // Cấu hình OAuth2 Login (Google)
+                // Cấu hình OAuth2 Login cho cả Google và Facebook
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(oauth2SuccessHandler)
                 )
-                // Chế độ Stateless (Không lưu session) cho JWT
+                // Chế độ Stateless cực kỳ quan trọng cho hiệu năng hệ thống
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // Kiểm tra Token trước khi thực hiện xác thực
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // Cấu hình CORS để Frontend (ví dụ localhost:3000) không bị lỗi chặn truy cập
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*")); // Cho phép tất cả các nguồn (có thể sửa thành domain FE sau)
+        // Tối ưu: Cho phép tất cả trong lúc phát triển, sẽ siết lại khi lên Production
+        configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type"));
+        configuration.setAllowCredentials(true);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

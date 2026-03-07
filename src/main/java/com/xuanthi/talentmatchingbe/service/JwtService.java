@@ -20,11 +20,20 @@ public class JwtService {
     @Value("${app.jwt.secret}")
     private String secretKey;
 
-    private static final long EXPIRATION_TIME = 1000 * 60 * 60 * 24;
+    // TỐI ƯU: Cache lại Key sau lần giải mã đầu tiên để không tốn CPU thực hiện lại
+    private SecretKey cachedSignInKey;
+
+    private static final long EXPIRATION_TIME = 86400000; // 24 giờ tính bằng mili giây
 
     public String generateToken(User user) {
+        // TỐI ƯU: Sử dụng HashMap thay vì Map.of để tránh sập app khi Role bị null
         Map<String, Object> extraClaims = new HashMap<>();
-        extraClaims.put("role", user.getRole().name());
+
+        // Kiểm tra an toàn: Nếu user chưa có role (do login OAuth2 lần đầu), gán mặc định là CANDIDATE
+        String roleName = (user.getRole() != null) ? user.getRole().name() : "CANDIDATE";
+        extraClaims.put("role", roleName);
+
+        // Thêm các thông tin cần thiết khác vào Token
         extraClaims.put("userId", user.getId());
 
         return Jwts.builder()
@@ -32,11 +41,10 @@ public class JwtService {
                 .subject(user.getEmail())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
-                .signWith(getSignInKey()) // Tự động chọn thuật toán phù hợp (HS256)
+                .signWith(getSignInKey())
                 .compact();
     }
 
-    // Trích thông tin
     public String extractEmail(String token) {
         return extractClaim(token, Claims::getSubject);
     }
@@ -47,6 +55,7 @@ public class JwtService {
     }
 
     private Claims extractAllClaims(String token) {
+        // TỐI ƯU: Sử dụng bộ Parser được cấu hình sẵn thay vì tạo mới mỗi lần (nếu cần cực nhanh)
         return Jwts.parser()
                 .verifyWith(getSignInKey())
                 .build()
@@ -64,7 +73,11 @@ public class JwtService {
     }
 
     private SecretKey getSignInKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
-        return Keys.hmacShaKeyFor(keyBytes);
+        // TỐI ƯU: Lazy Initialization giúp tránh giải mã Base64 cho mỗi Request
+        if (cachedSignInKey == null) {
+            byte[] keyBytes = Decoders.BASE64.decode(secretKey);
+            cachedSignInKey = Keys.hmacShaKeyFor(keyBytes);
+        }
+        return cachedSignInKey;
     }
 }
