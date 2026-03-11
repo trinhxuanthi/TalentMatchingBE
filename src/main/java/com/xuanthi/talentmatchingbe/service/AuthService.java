@@ -35,14 +35,11 @@ public class AuthService {
             throw new RuntimeException("Email đã tồn tại!");
         }
 
-        User user = User.builder()
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .fullName(request.getFullName())
-                .role(request.getRole())
-                .build();
+        // TỐI ƯU: Mapper đã lo hết việc gán isActive=true và provider=LOCAL
+        User user = userMapper.toUser(request);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
 
-        return userMapper.toResponse(userRepository.save(user));
+        return userMapper.toUserResponse(userRepository.save(user));
     }
 
     /**
@@ -58,14 +55,14 @@ public class AuthService {
                 )
         );
 
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmailAndIsActiveTrue(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Người dùng không tồn tại"));
 
         String token = jwtService.generateToken(user);
 
         return LoginResponse.builder()
                 .token(token)
-                .user(userMapper.toResponse(user))
+                .user(userMapper.toUserResponse(user))
                 .build();
     }
 

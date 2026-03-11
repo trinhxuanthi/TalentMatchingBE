@@ -3,6 +3,7 @@ package com.xuanthi.talentmatchingbe.config;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -18,6 +19,7 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
+@EnableMethodSecurity // Để @PreAuthorize hoạt động
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
@@ -36,7 +38,8 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/auth/**"
                         ).permitAll()
-
+                        .requestMatchers("/api/jobs/public").permitAll()
+                        .requestMatchers("/api/jobs/search").permitAll()
                         // Mở cửa cho toàn bộ tài liệu Swagger (Dành cho bản 3.0.2)
                         .requestMatchers(
                                 "/v3/api-docs/**",
@@ -53,10 +56,14 @@ public class SecurityConfig {
                         // ác yêu cầu còn lại bắt buộc phải có Token
                         .anyRequest().authenticated()
                 )
+                // --- PHẦN SỬA ĐỂ KHÔNG HIỆN HTML ---
+                .formLogin(form -> form.disable()) // Tắt form login mặc định
+                .httpBasic(basic -> basic.disable()) // Tắt xác thực basic mặc định
                 // Cấu hình OAuth2 Login cho cả Google và Facebook
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(oauth2SuccessHandler)
                 )
+
                 // Chế độ Stateless cực kỳ quan trọng cho hiệu năng hệ thống
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
