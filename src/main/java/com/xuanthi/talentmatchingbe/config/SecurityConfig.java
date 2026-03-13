@@ -31,9 +31,13 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/change-password").authenticated()
                         // Mở cửa cho Auth API và các luồng OAuth2
                         .requestMatchers(
-                                "/api/auth/**",
+                                "/api/auth/login",
+                                "/api/auth/register",
+                                "/api/auth/forgot-password",
+                                "/api/auth/reset-password",
                                 "/login/**",
                                 "/oauth2/**",
                                 "/auth/**"
@@ -55,6 +59,13 @@ public class SecurityConfig {
 
                         // ác yêu cầu còn lại bắt buộc phải có Token
                         .anyRequest().authenticated()
+                )
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write("{\"message\": \"Bạn cần đăng nhập để thực hiện chức năng này!\"}");
+                        })
                 )
                 // --- PHẦN SỬA ĐỂ KHÔNG HIỆN HTML ---
                 .formLogin(form -> form.disable()) // Tắt form login mặc định

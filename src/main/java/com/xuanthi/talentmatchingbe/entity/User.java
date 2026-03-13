@@ -64,6 +64,12 @@ public class User implements UserDetails {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "reset_otp")
+    private String resetOtp;
+
+    @Column(name = "otp_expiry")
+    private LocalDateTime otpExpiry;
+
     // TỐI ƯU: mappedBy phải khớp với tên biến 'employer' bên class Job
     // cascade = ALL: Nếu xóa User thì xóa luôn các Job của họ (tùy nghiệp vụ)
     // orphanRemoval: Tự động dọn dẹp các Job không còn chủ sở hữu

@@ -34,18 +34,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         final String userEmail;
-        final String servletPath = request.getServletPath();
 
-        // TỐI ƯU: Bypass nhanh cho các link công cộng để giảm tải CPU
-        if (servletPath.contains("/api/auth") ||
-                servletPath.contains("/oauth2") ||
-                servletPath.contains("/swagger-ui") ||
-                servletPath.contains("/v3/api-docs")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        // Kiểm tra Token (phải bắt đầu bằng "Bearer ")
+        // Kiểm tra Token (phải có Header và bắt đầu bằng "Bearer ")
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -53,13 +43,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         jwt = authHeader.substring(7);
 
-        // TỐI ƯU: Chỉ extract email nếu thực sự cần thiết
         try {
             userEmail = jwtService.extractEmail(jwt);
 
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
+                // Kiểm tra xem Token còn hạn và đúng User không
                 if (jwtService.isTokenValid(jwt, userDetails.getUsername())) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
@@ -67,11 +57,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             userDetails.getAuthorities()
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                    // Nạp user vào hệ thống
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
         } catch (Exception e) {
-            // TỐI ƯU: Nếu Token sai định dạng hoặc hết hạn, dừng xử lý ngay
+            // Nếu Token lỗi hoặc hết hạn, cho đi tiếp nhưng không có Authentication
+            // Spring Security sẽ tự chặn ở bước tiếp theo nếu API yêu cầu quyền
             filterChain.doFilter(request, response);
             return;
         }
