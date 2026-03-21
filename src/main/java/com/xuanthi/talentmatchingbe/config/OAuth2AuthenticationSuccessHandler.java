@@ -2,7 +2,7 @@ package com.xuanthi.talentmatchingbe.config;
 
 import com.xuanthi.talentmatchingbe.entity.User;
 import com.xuanthi.talentmatchingbe.repository.UserRepository;
-import com.xuanthi.talentmatchingbe.service.JwtService;
+import com.xuanthi.talentmatchingbe.security.JwtService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;

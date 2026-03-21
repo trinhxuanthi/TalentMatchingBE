@@ -1,0 +1,4 @@
+ALTER TABLE users
+    ADD COLUMN cv_url VARCHAR(500) NULL,
+ADD COLUMN is_cv_analyzed TINYINT(1) DEFAULT 0,
+ADD COLUMN cv_updated_at DATETIME NULL;

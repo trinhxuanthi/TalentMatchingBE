@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
@@ -39,4 +40,13 @@ public interface JobRepository extends JpaRepository<Job, Long> {
             JobType jobType,
             BigDecimal minSalary,
             Pageable pageable);
+
+    // Lấy Job theo ID Công ty (thông qua User), điều kiện: Job phải đang OPEN
+    @Query("SELECT j FROM Job j WHERE j.employer.company.id = :companyId AND j.status = 'OPEN'")
+    Page<Job> findActiveJobsByCompany(@Param("companyId") Long companyId, Pageable pageable);
+
+    // Dùng cho ô Search: Tìm Job theo ID Công ty VÀ Tên công việc
+    @Query("SELECT j FROM Job j WHERE j.employer.company.id = :companyId " +
+            "AND j.status = 'OPEN' AND LOWER(j.title) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    Page<Job> searchActiveJobsByCompany(@Param("companyId") Long companyId, @Param("keyword") String keyword, Pageable pageable);
 }

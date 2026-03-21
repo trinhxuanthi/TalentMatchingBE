@@ -8,6 +8,7 @@ import com.xuanthi.talentmatchingbe.entity.User;
 import com.xuanthi.talentmatchingbe.enums.Role;
 import com.xuanthi.talentmatchingbe.mapper.UserMapper;
 import com.xuanthi.talentmatchingbe.repository.UserRepository;
+import com.xuanthi.talentmatchingbe.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;

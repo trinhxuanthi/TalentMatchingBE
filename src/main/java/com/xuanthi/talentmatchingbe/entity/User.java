@@ -70,11 +70,22 @@ public class User implements UserDetails {
     @Column(name = "otp_expiry")
     private LocalDateTime otpExpiry;
 
+    @Column(name = "cv_url", length = 500)
+    private String cvUrl; // Link file từ Cloudinary
+
+    @Column(name = "is_cv_analyzed")
+    private Boolean isCvAnalyzed = false; // Đánh dấu để Python biết cần xử lý
+
+    private LocalDateTime cvUpdatedAt;
+
     // TỐI ƯU: mappedBy phải khớp với tên biến 'employer' bên class Job
     // cascade = ALL: Nếu xóa User thì xóa luôn các Job của họ (tùy nghiệp vụ)
     // orphanRemoval: Tự động dọn dẹp các Job không còn chủ sở hữu
     @OneToMany(mappedBy = "employer", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Job> jobs;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Company company;
 
     // --- CÁC PHƯƠNG THỨC TỐI ƯU CỦA USERDETAILS ---
 

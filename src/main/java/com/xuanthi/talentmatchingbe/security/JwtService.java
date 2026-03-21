@@ -1,4 +1,4 @@
-package com.xuanthi.talentmatchingbe.service;
+package com.xuanthi.talentmatchingbe.security;
 
 import com.xuanthi.talentmatchingbe.entity.User;
 import io.jsonwebtoken.Claims;

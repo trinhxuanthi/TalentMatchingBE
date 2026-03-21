@@ -34,6 +34,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/change-password").authenticated()
                         // Mở cửa cho Auth API và các luồng OAuth2
                         .requestMatchers(
+                                "/api/public/companies/**",
                                 "/api/auth/login",
                                 "/api/auth/register",
                                 "/api/auth/forgot-password",
@@ -85,8 +86,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Tối ưu: Cho phép tất cả trong lúc phát triển, sẽ siết lại khi lên Production
-        configuration.setAllowedOriginPatterns(List.of("*"));
+        configuration.setAllowedOriginPatterns(List.of("http://localhost:3000"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type"));
         configuration.setAllowCredentials(true);

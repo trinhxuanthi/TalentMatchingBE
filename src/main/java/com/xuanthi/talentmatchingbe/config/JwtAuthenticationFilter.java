@@ -1,6 +1,6 @@
 package com.xuanthi.talentmatchingbe.config;
 
-import com.xuanthi.talentmatchingbe.service.JwtService;
+import com.xuanthi.talentmatchingbe.security.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

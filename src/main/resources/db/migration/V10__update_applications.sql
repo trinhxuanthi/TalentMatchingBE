@@ -1,0 +1,1 @@
+ALTER TABLE applications MODIFY COLUMN is_ai_scored INT DEFAULT 0;

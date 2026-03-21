@@ -17,6 +17,7 @@ public class UserResponse {
     private Role role;
     private String phoneNumber;
     private String provider;
+    private String cvUrl;
     @JsonProperty("isActive")
     private boolean isActive;
 }
