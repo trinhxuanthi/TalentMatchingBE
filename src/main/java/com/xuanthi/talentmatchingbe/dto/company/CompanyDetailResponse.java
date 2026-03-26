@@ -11,5 +11,6 @@ public class CompanyDetailResponse {
     private String logoUrl;
     private String address;
     private String website;
-    private String description; // Trả về nguyên bài viết dài (có thể chứa HTML)
+    private String description;
+    private String employerEmail;// Trả về nguyên bài viết dài (có thể chứa HTML)
 }

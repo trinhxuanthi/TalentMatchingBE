@@ -1,5 +1,6 @@
 package com.xuanthi.talentmatchingbe.service;
 
+import com.xuanthi.talentmatchingbe.dto.company.AdminCompanyResponse;
 import com.xuanthi.talentmatchingbe.dto.company.CompanyDetailResponse;
 import com.xuanthi.talentmatchingbe.dto.company.CompanyResponse;
 import com.xuanthi.talentmatchingbe.dto.user.EmployerUpgradeRequest;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -72,8 +74,23 @@ public class CompanyService {
     // 2. NGHIỆP VỤ CỦA QUẢN TRỊ VIÊN (ADMIN)
     // ==========================================
     @Transactional(readOnly = true)
-    public List<Company> getPendingCompanies() {
-        return companyRepository.findByApprovalStatus("PENDING");
+    public List<AdminCompanyResponse> getPendingCompanies() {
+        List<Company> pendingCompanies = companyRepository.findByApprovalStatus("PENDING");
+
+        return pendingCompanies.stream().map(company -> AdminCompanyResponse.builder()
+                .id(company.getId())
+                .name(company.getName())
+                .taxCode(company.getTaxCode())
+                .address(company.getAddress())
+                .website(company.getWebsite())
+                .businessLicenseUrl(company.getBusinessLicenseUrl())
+                .hrPosition(company.getHrPosition())
+                .approvalStatus(company.getApprovalStatus())
+                // Lấy thông tin User thông qua Company
+                .applicantEmail(company.getUser() != null ? company.getUser().getEmail() : null)
+                .applicantName(company.getUser() != null ? company.getUser().getFullName() : null)
+                .build()
+        ).collect(Collectors.toList());
     }
 
     @Transactional
@@ -154,6 +171,7 @@ public class CompanyService {
                 .address(company.getAddress())
                 .website(company.getWebsite())
                 .description(company.getDescription())
+                .employerEmail(company.getUser() != null ? company.getUser().getEmail() : null)
                 .build();
     }
 }

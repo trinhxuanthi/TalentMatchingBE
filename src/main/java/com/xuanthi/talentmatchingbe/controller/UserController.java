@@ -1,9 +1,9 @@
 package com.xuanthi.talentmatchingbe.controller;
 
+import com.xuanthi.talentmatchingbe.dto.company.AdminCompanyResponse;
 import com.xuanthi.talentmatchingbe.dto.user.EmployerUpgradeRequest;
 import com.xuanthi.talentmatchingbe.dto.user.UserResponse;
 import com.xuanthi.talentmatchingbe.dto.user.UserUpdateRequest;
-import com.xuanthi.talentmatchingbe.entity.Company;
 import com.xuanthi.talentmatchingbe.entity.User;
 import com.xuanthi.talentmatchingbe.repository.UserRepository;
 import com.xuanthi.talentmatchingbe.service.CompanyService;
@@ -74,7 +74,8 @@ public class UserController {
     @Operation(summary = "Lấy các yêu cầu đang chờ xét duyệt lên Employer")
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/pending")
-    public ResponseEntity<List<Company>> getPendingCompanies() {
+    public ResponseEntity<List<AdminCompanyResponse>> getPendingCompanies() {
+        // Đổi kiểu trả về thành DTO
         return ResponseEntity.ok(companyService.getPendingCompanies());
     }
 

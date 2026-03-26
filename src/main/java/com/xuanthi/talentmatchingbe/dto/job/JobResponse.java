@@ -64,4 +64,5 @@ public class JobResponse {
     private Long employerId;
     private String employerName;
     private String employerAvatar;
+    private String employerEmail;
 }
