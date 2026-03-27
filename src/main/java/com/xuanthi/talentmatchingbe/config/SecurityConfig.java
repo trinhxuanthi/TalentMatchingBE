@@ -45,6 +45,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/api/jobs/public").permitAll()
                         .requestMatchers("/api/jobs/search").permitAll()
+                        .requestMatchers("/ws-chat/**").permitAll()
                         // Mở cửa cho toàn bộ tài liệu Swagger (Dành cho bản 3.0.2)
                         .requestMatchers(
                                 "/v3/api-docs/**",

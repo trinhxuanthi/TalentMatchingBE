@@ -76,16 +76,15 @@ public class JobService {
 
     @Transactional
     public void deleteJob(Long jobId) {
+        // 1. Tìm Job cần xóa
         Job job = jobRepository.findById(jobId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy bài đăng!"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc với ID: " + jobId));
 
-        // Kiểm tra quyền sở hữu
-        User currentUser = SecurityUtils.getCurrentUser();
-        if (!job.getEmployer().getId().equals(currentUser.getId())) {
-            throw new RuntimeException("Bạn không có quyền xóa bài đăng này!");
-        }
+        // 2. Thay vì dùng jobRepository.delete(job), ta chỉ cập nhật trạng thái thành DELETED
+        job.setStatus(JobStatus.DELETED);
 
-        jobRepository.delete(job);
+        // 3. Lưu lại vào Database
+        jobRepository.save(job);
     }
 
     public Page<JobResponse> getAllPublicJobs(int page, int size) {

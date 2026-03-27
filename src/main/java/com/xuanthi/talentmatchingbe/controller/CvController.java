@@ -1,40 +1,33 @@
 package com.xuanthi.talentmatchingbe.controller;
 
-import com.xuanthi.talentmatchingbe.dto.cv.CvRequest;
 import com.xuanthi.talentmatchingbe.service.CvService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.security.Principal;
-import java.util.Map;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/cv")
 @RequiredArgsConstructor
-@Tag(name = "CvController", description = "Các API liên quan đến CV")
 public class CvController {
 
-    private final CvService cvService;
+    private final CvService cvService; // Tên Service của bro có thể khác
 
-    @Operation(summary = "Upload CV")
-    @PostMapping("/upload")
-    public ResponseEntity<?> uploadCv(Principal principal, @RequestBody CvRequest request) {
-        if (principal == null) {
-            return ResponseEntity.status(401).body("Bạn cần đăng nhập!");
+    // Đánh dấu consumes = MULTIPART_FORM_DATA_VALUE để báo cho Spring biết: "Hàm này chuyên nhận File"
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<String> uploadCv(@RequestParam("file") MultipartFile file) {
+
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body("File không được để trống!");
         }
 
-        if (request.getCvUrl() == null || request.getCvUrl().isEmpty()) {
-            return ResponseEntity.badRequest().body("Link CV không hợp lệ");
-        }
+        // Gọi đúng cái hàm vừa viết
+        String fileUrl = cvService.uploadAndUpdateCv(file);
 
-        cvService.updateCvUrl(principal.getName(), request.getCvUrl());
-
-        return ResponseEntity.ok(Map.of(
-                "message", "Lưu link CV thành công!",
-                "status", "Đang chờ AI phân tích"
-        ));
+        return ResponseEntity.ok(fileUrl);
     }
 }
