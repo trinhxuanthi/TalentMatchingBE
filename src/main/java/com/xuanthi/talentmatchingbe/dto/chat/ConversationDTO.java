@@ -17,4 +17,5 @@ public class ConversationDTO {
     private String partnerAvatar;// Ảnh đại diện
     private String lastMessage;
     private LocalDateTime updatedAt;
+    private String partnerEmail;
 }

@@ -1,13 +1,13 @@
 package com.xuanthi.talentmatchingbe.controller;
 
-import com.xuanthi.talentmatchingbe.dto.ai.QuickMatchResponse;
-import com.xuanthi.talentmatchingbe.dto.ai.RankingResponse;
-import com.xuanthi.talentmatchingbe.dto.application.*;
+import com.xuanthi.talentmatchingbe.dto.application.ApplicationResponse;
+import com.xuanthi.talentmatchingbe.dto.application.CandidateDashboardResponse;
+import com.xuanthi.talentmatchingbe.dto.application.EmployerDashboardResponse;
+import com.xuanthi.talentmatchingbe.dto.application.MonthlyStatResponse;
 import com.xuanthi.talentmatchingbe.enums.ApplicationStatus;
 import com.xuanthi.talentmatchingbe.service.ApplicationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -28,12 +28,6 @@ public class ApplicationController {
     // 1. LUỒNG ỨNG VIÊN (CANDIDATE)
     // ==========================================
 
-    @PostMapping("/apply")
-    @PreAuthorize("hasRole('CANDIDATE')")
-    @Operation(summary = "Ứng viên nộp Form và Link CV")
-    public ResponseEntity<String> apply(@Valid @RequestBody ApplicationRequest request) {
-        return ResponseEntity.ok(applicationService.applyJob(request));
-    }
 
     @GetMapping("/my-applications")
     @PreAuthorize("hasRole('CANDIDATE')")
@@ -76,14 +70,7 @@ public class ApplicationController {
         return ResponseEntity.ok("Cập nhật trạng thái ứng viên thành công!");
     }
 
-    // 🔥 API QUAN TRỌNG NHẤT: XẾP HẠNG AI
-    @GetMapping("/ranking/{jobId}")
-    @PreAuthorize("hasAnyRole('EMPLOYER', 'ADMIN')") // Đã khóa bảo mật
-    @Operation(summary = "Nhà tuyển dụng xem Bảng xếp hạng CV theo điểm AI (Ranking List)")
-    public ResponseEntity<List<RankingResponse>> getRankingByJob(@PathVariable Long jobId) {
-        List<RankingResponse> rankingList = applicationService.getRankingByJob(jobId);
-        return ResponseEntity.ok(rankingList);
-    }
+
 
     // ==========================================
     // 3. DASHBOARD NHÀ TUYỂN DỤNG
@@ -103,14 +90,5 @@ public class ApplicationController {
         return ResponseEntity.ok(applicationService.getMonthlyStats());
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYER')")
-    @PostMapping("/jobs/{jobId}/quick-check")
-    @Operation(summary = "Check CV AI nóng dành cho Employer")
-    public ResponseEntity<QuickMatchResponse> quickCheckCandidateCv(
-            @PathVariable Long jobId,
-            @RequestParam String cvUrl) {
 
-        QuickMatchResponse result = applicationService.quickCheckCv(jobId, cvUrl);
-        return ResponseEntity.ok(result);
-    }
 }

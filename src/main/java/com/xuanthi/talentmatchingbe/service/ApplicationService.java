@@ -1,11 +1,10 @@
 package com.xuanthi.talentmatchingbe.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.xuanthi.talentmatchingbe.dto.ai.AiAnalysisDTO;
-import com.xuanthi.talentmatchingbe.dto.ai.QuickMatchResponse;
-import com.xuanthi.talentmatchingbe.dto.ai.RankingResponse;
-import com.xuanthi.talentmatchingbe.dto.application.*;
+import com.xuanthi.talentmatchingbe.dto.application.ApplicationResponse;
+import com.xuanthi.talentmatchingbe.dto.application.CandidateDashboardResponse;
+import com.xuanthi.talentmatchingbe.dto.application.EmployerDashboardResponse;
+import com.xuanthi.talentmatchingbe.dto.application.MonthlyStatResponse;
 import com.xuanthi.talentmatchingbe.entity.Application;
 import com.xuanthi.talentmatchingbe.entity.Job;
 import com.xuanthi.talentmatchingbe.entity.User;
@@ -27,12 +26,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -54,83 +50,6 @@ public class ApplicationService {
     // 1. LUỒNG NỘP ĐƠN (Lọc Cứng & Chuyển Trạng Thái)
     // ==============================================================
     @Transactional
-    public String applyJob(ApplicationRequest request) {
-        User currentUser = SecurityUtils.getCurrentUser();
-
-        // 1. Kiểm tra chống spam (Đã nộp rồi thì không cho nộp lại)
-        if (applicationRepository.existsByJobIdAndCandidateIdAndIsActiveTrue(request.getJobId(), currentUser.getId())) {
-            throw new RuntimeException("Bạn đã nộp đơn cho công việc này rồi!");
-        }
-
-        Job job = jobRepository.findById(request.getJobId())
-                .orElseThrow(() -> new RuntimeException("Công việc không tồn tại!"));
-
-        // ==========================================
-        // 🛑 BỘ LỌC CỨNG (VÒNG GỬI XE)
-        // ==========================================
-        boolean isRejected = false;
-        String rejectReason = "";
-
-        // Kiểm tra Hạn chót
-        if (job.getDeadline() != null && job.getDeadline().isBefore(LocalDateTime.now())) {
-            isRejected = true;
-            rejectReason = "Công việc đã hết hạn nộp hồ sơ.";
-        }
-
-        // Kiểm tra Kinh nghiệm (Lấy số từ chuỗi, vd: "3-5 năm" -> 3)
-        if (!isRejected) {
-            int requiredYears = parseExperience(job.getExperienceLevel());
-            if (request.getYearsOfExperience() < requiredYears) {
-                isRejected = true;
-                rejectReason = "Không đủ số năm kinh nghiệm (Yêu cầu tối thiểu: " + requiredYears + " năm).";
-            }
-        }
-
-        // Kiểm tra Học vấn
-        if (!isRejected) {
-            if (getEducationRank(request.getEducationLevel()) < getEducationRank(job.getEducationLevel())) {
-                isRejected = true;
-                rejectReason = "Trình độ học vấn không đạt yêu cầu (Yêu cầu: " + job.getEducationLevel() + ").";
-            }
-        }
-
-        // 2. Tạo Entity lưu vào Database
-        Application app = Application.builder()
-                .job(job)
-                .candidate(currentUser)
-                .cvUrl(request.getCvUrl())
-                .fullName(request.getFullName())
-                .email(request.getEmail())
-                .phone(request.getPhone())
-                .educationLevel(request.getEducationLevel())
-                .yearsOfExperience(request.getYearsOfExperience())
-                .status(isRejected ? ApplicationStatus.REJECTED : ApplicationStatus.PENDING)
-                .notes(isRejected ? "Hệ thống tự động loại: " + rejectReason : null)
-                .isAiScored(isRejected ? -2 : 0) // -2: Bị loại từ vòng gửi xe, 0: Chờ AI
-                .appliedAt(LocalDateTime.now())
-                .build();
-
-        Application savedApp = applicationRepository.save(app);
-
-        // 3. Xử lý sau khi lưu
-        if (isRejected) {
-            // Thông báo ngay cho ứng viên nếu bị loại
-            notificationService.sendNotification(
-                    currentUser.getId(),
-                    job.getEmployer().getId(),
-                    "Kết quả sơ loại hồ sơ",
-                    "Rất tiếc, hồ sơ của bạn chưa đáp ứng yêu cầu tối thiểu cho vị trí: " + job.getTitle() + ". Lý do: " + rejectReason,
-                    "APPLICATION",
-                    savedApp.getId()
-            );
-            return "Hồ sơ của bạn đã được ghi nhận";
-        }
-
-        // Nếu qua vòng gửi xe, gọi AI phân tích ngầm
-        callPythonAiToEvaluate(savedApp.getId(), job.getId());
-
-        return "Nộp đơn thành công! ";
-    }
 
     // ==============================================================
     // 2. GỌI PYTHON AI (Xử lý Bất đồng bộ)
@@ -250,59 +169,8 @@ public class ApplicationService {
         return applicationMapper.toResponse(app);
     }
 
-    // ==============================================================
-    // 4. LẤY BẢNG XẾP HẠNG (RANKING) CHO EMPLOYER
-    // ==============================================================
-    public List<RankingResponse> getRankingByJob(Long jobId) {
-        List<Application> apps = applicationRepository.findRankingByJobId(jobId);
-        return apps.stream()
-                .map(this::convertToRankingResponse)
-                .collect(Collectors.toList());
-    }
 
-    private RankingResponse convertToRankingResponse(Application app) {
-        AiAnalysisDTO analysisObj;
 
-        if (app.getIsAiScored() != null && app.getIsAiScored() == 2 && app.getAiAnalysis() != null) {
-            try {
-                analysisObj = objectMapper.readValue(app.getAiAnalysis(), AiAnalysisDTO.class);
-            } catch (JsonProcessingException e) {
-                log.error("❌ Lỗi Parse JSON AI Analysis App ID {}: {}", app.getId(), e.getMessage());
-                analysisObj = createDefaultAnalysis("Lỗi định dạng dữ liệu AI.");
-            }
-        } else {
-            String msg = switch (app.getIsAiScored() == null ? 0 : app.getIsAiScored()) {
-                case 0, 1 -> "Hệ thống đang phân tích...";
-                case -1 -> "AI gặp lỗi khi đọc file CV này.";
-                case -2 -> "Bị loại do không đáp ứng yêu cầu tối thiểu (Kinh nghiệm/Học vấn).";
-                default -> "Chưa có dữ liệu.";
-            };
-            analysisObj = createDefaultAnalysis(msg);
-        }
-
-        return RankingResponse.builder()
-                .applicationId(app.getId())
-                .candidateName(app.getFullName() != null ? app.getFullName() : app.getCandidate().getFullName())
-                .cvUrl(app.getCvUrl())
-                .matchScore(app.getMatchScore() != null ? app.getMatchScore() : 0.0)
-                .aiAnalysis(analysisObj)
-                .appliedAt(app.getAppliedAt())
-                .build();
-    }
-
-    private AiAnalysisDTO createDefaultAnalysis(String message) {
-        AiAnalysisDTO dto = new AiAnalysisDTO();
-        dto.setConclusion(message);
-
-        AiAnalysisDTO.SkillsAnalysis skills = new AiAnalysisDTO.SkillsAnalysis();
-        skills.setMatchedMustHave(List.of());
-        skills.setMissingMustHave(List.of());
-        skills.setMatchedNiceToHave(List.of());
-        skills.setMissingNiceToHave(List.of());
-        dto.setSkillsAnalysis(skills);
-
-        return dto;
-    }
 
     // ==============================================================
     // 5. THỐNG KÊ DASHBOARD (Giữ nguyên logic của bạn)
@@ -358,87 +226,7 @@ public class ApplicationService {
                 .collect(Collectors.toList());
     }
 
-    // ==============================================================
-    // 6. HELPER FUNCTIONS (So sánh logic)
-    // ==============================================================
 
-    /**
-     * Quy đổi học vấn ra điểm (Rank) để so sánh
-     */
-    private int getEducationRank(String level) {
-        if (level == null || level.trim().isEmpty()) return 0;
-        return switch (level.trim().toLowerCase()) {
-            case "tiến sĩ", "trên đại học" -> 6;
-            case "thạc sĩ" -> 5;
-            case "đại học", "cử nhân" -> 4;
-            case "cao đẳng" -> 3;
-            case "trung cấp" -> 2;
-            case "thpt", "cấp 3" -> 1;
-            default -> 0; // Lao động phổ thông
-        };
-    }
 
-    /**
-     * Tách số năm kinh nghiệm từ chuỗi (Vd: "Trên 3 năm" -> 3, "Không yêu cầu" -> 0)
-     */
-    private int parseExperience(String expText) {
-        if (expText == null || expText.trim().isEmpty()) return 0;
 
-        // Dùng Regex tìm cụm số đầu tiên trong chuỗi
-        Matcher matcher = Pattern.compile("\\d+").matcher(expText);
-        if (matcher.find()) {
-            return Integer.parseInt(matcher.group());
-        }
-        return 0; // Không có số nào -> 0 năm
-    }
-
-    // ==============================================================
-    // 7. LUỒNG CHECK CV NÓNG (Dành cho Nhà Tuyển Dụng)
-    // ==============================================================
-    public QuickMatchResponse quickCheckCv(Long jobId, String cvUrl) {
-        // 1. Lấy thông tin Job để làm gốc so sánh
-        Job job = jobRepository.findById(jobId)
-                .orElseThrow(() -> new RuntimeException("Công việc không tồn tại!"));
-
-        try {
-            // 2. Lấy từ điển động
-            Map<String, String> dynamicAliases = skillAliasService.getDynamicAliasesMap();
-
-            // 3. Chuẩn bị Payload gửi Python
-            Map<String, Object> requestPayload = new HashMap<>();
-            requestPayload.put("cv_url", cvUrl);
-            requestPayload.put("job_requirements", job.getDescription() + " " + job.getRequirements());
-            requestPayload.put("job_skills_json", job.getRequiredSkills());
-            requestPayload.put("dynamic_aliases", dynamicAliases);
-
-            log.info("🔥 [QUICK CHECK] Đang chấm nóng CV: {}", cvUrl);
-
-            // 4. Gọi Python ĐỒNG BỘ (Code sẽ đứng chờ ở đây khoảng 2-3s cho đến khi AI trả kết quả)
-            ResponseEntity<Map> response = restTemplate.postForEntity(PYTHON_AI_URL, requestPayload, Map.class);
-
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                Map<String, Object> aiResult = response.getBody();
-
-                // Lấy điểm
-                Double score = Double.valueOf(aiResult.get("match_score").toString());
-
-                // Parse dữ liệu phân tích thành Object để gửi về Frontend
-                String analysisJson = objectMapper.writeValueAsString(aiResult.get("ai_analysis"));
-                AiAnalysisDTO analysisObj = objectMapper.readValue(analysisJson, AiAnalysisDTO.class);
-
-                log.info("✅ [QUICK CHECK] Hoàn tất! Điểm: {}", score);
-
-                // Trả thẳng kết quả về cho Frontend, KHÔNG lưu vào bảng Application
-                return QuickMatchResponse.builder()
-                        .matchScore(score)
-                        .aiAnalysis(analysisObj)
-                        .build();
-            } else {
-                throw new RuntimeException("AI Server trả về lỗi.");
-            }
-        } catch (Exception e) {
-            log.error("❌ [QUICK CHECK] Lỗi chấm nóng: {}", e.getMessage());
-            throw new RuntimeException("Không thể phân tích CV lúc này. Vui lòng thử lại sau.");
-        }
-    }
 }

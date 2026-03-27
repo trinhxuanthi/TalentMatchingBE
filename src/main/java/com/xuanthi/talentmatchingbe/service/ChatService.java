@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -97,6 +98,7 @@ public class ChatService {
                     .partnerId(partner.getId())
                     .partnerName(partner.getFullName()) // Lấy tên người chat cùng
                     .partnerAvatar(partner.getAvatar()) // Lấy ảnh người chat cùng
+                    .partnerEmail(partner.getEmail())   // 🔥 ĐÃ SỬA: Bỏ chữ "set" đi nha bro!
                     .lastMessage(conv.getLastMessage())
                     .updatedAt(conv.getUpdatedAt())     // Thời gian tin nhắn cuối
                     .build();
@@ -105,19 +107,35 @@ public class ChatService {
 
     @Transactional(readOnly = true)
     public List<ChatMessageDTO> getChatHistory(Long conversationId) {
+        // 1. Query lấy lịch sử tin nhắn
         List<Message> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
 
-        // Chỉ lấy những thứ cần thiết, bỏ lồng ghép Entity
-        return messages.stream().map(msg -> ChatMessageDTO.builder()
-                .id(msg.getId())
-                .conversationId(msg.getConversation().getId())
-                .senderId(msg.getSender().getId())
-                .senderEmail(msg.getSender().getEmail())
-                .content(msg.getContent())
-                .isRead(msg.isRead()) // Hoặc getIsRead() tuỳ bro đặt tên biến boolean
-                .createdAt(msg.getCreatedAt())
-                .build()
-        ).collect(Collectors.toList());
+        // Xử lý list rỗng để tránh lỗi NullPointer
+        if (messages.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 🔥 TỐI ƯU HÓA: Lấy thông tin phòng chat 1 lần duy nhất ở ngoài vòng lặp
+        Conversation conv = messages.get(0).getConversation();
+        User employer = conv.getEmployer();
+        User candidate = conv.getCandidate();
+
+        // 2. Map sang DTO
+        return messages.stream().map(msg -> {
+            // Xác định người nhận: Nếu người gửi là Employer thì người nhận là Candidate, và ngược lại
+            User receiver = msg.getSender().getId().equals(employer.getId()) ? candidate : employer;
+
+            return ChatMessageDTO.builder()
+                    .id(msg.getId())
+                    .conversationId(conv.getId())
+                    .senderId(msg.getSender().getId())
+                    .senderEmail(msg.getSender().getEmail())
+                    .content(msg.getContent())
+                    .isRead(msg.isRead())
+                    .createdAt(msg.getCreatedAt())
+                    .receiverEmail(receiver.getEmail()) // 🔥 Đã lấy được email người nhận chuẩn xác
+                    .build();
+        }).collect(Collectors.toList());
     }
 
     @Transactional
