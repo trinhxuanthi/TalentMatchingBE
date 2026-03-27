@@ -1,7 +1,7 @@
 package com.xuanthi.talentmatchingbe.controller;
 
-import com.xuanthi.talentmatchingbe.entity.Conversation;
-import com.xuanthi.talentmatchingbe.entity.Message;
+import com.xuanthi.talentmatchingbe.dto.chat.ChatMessageDTO;
+import com.xuanthi.talentmatchingbe.dto.chat.ConversationDTO;
 import com.xuanthi.talentmatchingbe.service.ChatService;
 import com.xuanthi.talentmatchingbe.util.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,18 +23,19 @@ public class ChatRestController {
     // 1. Lấy danh sách các phòng chat của tôi (Khung bên trái giao diện chat)
     @Operation(summary = "Lấy danh sách các phòng chat của tôi (Khung bên trái giao diện chat)")
     @GetMapping("/conversations")
-    public ResponseEntity<List<Conversation>> getMyConversations() {
+    public ResponseEntity<List<ConversationDTO>> getMyConversations() {
         Long myUserId = SecurityUtils.getCurrentUser().getId();
+        // chatService giờ đã trả về List<ConversationDTO> sạch sẽ
         return ResponseEntity.ok(chatService.getMyConversations(myUserId));
     }
 
     // 2. Lấy lịch sử tin nhắn của 1 phòng chat cụ thể (Khung bên phải giao diện chat)
     @Operation(summary = "Lấy lịch sử tin nhắn của 1 phòng chat cụ thể (Khung bên phải giao diện chat)")
     @GetMapping("/conversations/{conversationId}/messages")
-    public ResponseEntity<List<Message>> getChatHistory(@PathVariable Long conversationId) {
+    public ResponseEntity<List<ChatMessageDTO>> getChatHistory(@PathVariable Long conversationId) {
+        // chatService giờ đã trả về List<ChatMessageDTO> gọn nhẹ
         return ResponseEntity.ok(chatService.getChatHistory(conversationId));
     }
-
     // 3. API để Đánh dấu Đã Đọc (Frontend gọi API này khi User click vào một phòng chat)
     @Operation(summary = "API để Đánh dấu Đã Đọc (Frontend gọi API này khi User click vào một phòng chat)")
     @PutMapping("/conversations/{conversationId}/read")

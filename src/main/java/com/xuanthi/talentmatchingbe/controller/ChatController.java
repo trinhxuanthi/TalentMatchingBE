@@ -1,6 +1,6 @@
 package com.xuanthi.talentmatchingbe.controller;
 
-import com.xuanthi.talentmatchingbe.dto.ChatMessageDTO;
+import com.xuanthi.talentmatchingbe.dto.chat.ChatMessageDTO;
 import com.xuanthi.talentmatchingbe.dto.chat.TypingDTO;
 import com.xuanthi.talentmatchingbe.service.ChatService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,7 +31,9 @@ public class ChatController {
     public void processMessage(@Payload ChatMessageDTO chatMessage, Principal principal) {
         String senderEmail = principal.getName();
         chatMessage.setSenderEmail(senderEmail);
-        chatMessage.setTimestamp(LocalDateTime.now());
+
+        // 🔥 ĐÃ SỬA Ở ĐÂY: Đổi setTimestamp thành setCreatedAt
+        chatMessage.setCreatedAt(LocalDateTime.now());
 
         // GỌI SERVICE LƯU VÀO DATABASE BỞI DÒNG NÀY:
         ChatMessageDTO savedMessage = chatService.saveMessage(chatMessage);
