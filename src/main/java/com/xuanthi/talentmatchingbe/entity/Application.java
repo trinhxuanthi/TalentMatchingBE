@@ -55,8 +55,8 @@ public class Application {
     // ==========================================
     // 3. KẾT QUẢ TỪ LÕI AI PYTHON
     // ==========================================
-    @Column(name = "match_score", columnDefinition = "DECIMAL(5,2)")
-    private Double matchScore; // Điểm AI (0.00 - 100.00)
+    @Column(name = "match_score")
+    private Integer matchScore;
 
     // Cờ trạng thái gọi AI: 0 (Chưa gọi/Đang chờ), 1 (Đã có điểm), -1 (AI lỗi/Không đọc được CV)
     @Column(name = "is_ai_scored")
@@ -103,4 +103,7 @@ public class Application {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "ai_recommendation", length = 255)
+    private String aiRecommendation;
 }

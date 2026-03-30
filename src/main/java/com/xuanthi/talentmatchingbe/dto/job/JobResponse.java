@@ -1,5 +1,7 @@
 package com.xuanthi.talentmatchingbe.dto.job;
 
+import com.xuanthi.talentmatchingbe.enums.EducationLevel;
+import com.xuanthi.talentmatchingbe.enums.JobLevel;
 import com.xuanthi.talentmatchingbe.enums.JobStatus;
 import com.xuanthi.talentmatchingbe.enums.JobType;
 import lombok.AllArgsConstructor;
@@ -24,7 +26,7 @@ public class JobResponse {
     private String title;
     private String location;
 
-    private boolean isSalaryNegotiable; // Thêm cờ Lương thỏa thuận
+    private boolean isSalaryNegotiable; // Cờ Lương thỏa thuận
     private BigDecimal salaryMin;
     private BigDecimal salaryMax;
 
@@ -32,12 +34,20 @@ public class JobResponse {
     private boolean isExpired;
 
     // ==========================================
-    // 2. KHỐI THÔNG TIN SIDEBAR (Chuẩn TopCV)
+    // 2. KHỐI THÔNG TIN SIDEBAR (Lọc & Phân loại)
     // ==========================================
     private JobType jobType;
     private String experienceLevel;
-    private String jobLevel;
-    private String educationLevel;
+
+    // 🔥 THÊM MỚI: Trả về số năm kinh nghiệm tối thiểu
+    private Integer minExpYears;
+
+    // 🔥 CẬP NHẬT: Ép kiểu Enum
+    private JobLevel jobLevel;
+
+    // 🔥 CẬP NHẬT: Ép kiểu Enum
+    private EducationLevel educationLevel;
+
     private Integer quantity;
 
     // ==========================================
@@ -45,14 +55,14 @@ public class JobResponse {
     // ==========================================
     private String description;
     private String benefits;
-    private String requirements; // Text yêu cầu công việc
+    private String requirements;
 
     // ==========================================
-    // 4. KHỐI KỸ NĂNG & DANH MỤC (Đã được parse từ JSON DB)
+    // 4. KHỐI KỸ NĂNG CỐT LÕI & DANH MỤC
     // ==========================================
-    private List<String> mustHaveSkills;   // Vẽ Tag màu Đỏ/Cam
-    private List<String> niceToHaveSkills; // Vẽ Tag màu Xanh/Xám
-    private List<String> categories;       // Vẽ Tag Danh mục nghề
+    // 🔥 CẬP NHẬT: Gộp thành 1 List duy nhất, Frontend sẽ vẽ Tag đồng loạt
+    private List<String> requiredSkills;
+    private List<String> categories;
 
     // ==========================================
     // 5. QUẢN LÝ TRẠNG THÁI & EMPLOYER
@@ -60,7 +70,7 @@ public class JobResponse {
     private JobStatus status;
     private LocalDateTime createdAt;
 
-    // TỐI ƯU: Trả về thông tin cơ bản của Employer để Frontend hiển thị luôn
+    // Thông tin Employer để Frontend hiển thị Card hoặc làm tính năng Chat
     private Long employerId;
     private String employerName;
     private String employerAvatar;

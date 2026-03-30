@@ -15,6 +15,7 @@ import java.util.List;
 
 @Repository
 public interface JobRepository extends JpaRepository<Job, Long> {
+
     // Lấy bài đăng theo trạng thái (cho ứng viên)
     Page<Job> findAllByStatus(JobStatus status, Pageable pageable);
 
@@ -27,26 +28,27 @@ public interface JobRepository extends JpaRepository<Job, Long> {
     // Lấy danh sách Job để thống kê chi tiết
     List<Job> findAllByEmployerId(Long employerId);
 
+    // 🔥 Đã tối ưu cách gọi Enum trong JPQL để tránh lỗi Type Mismatch của Hibernate
     @Query("SELECT j FROM Job j WHERE " +
             "(:title IS NULL OR LOWER(j.title) LIKE LOWER(CONCAT('%', :title, '%'))) AND " +
             "(:location IS NULL OR j.location = :location) AND " +
             "(:jobType IS NULL OR j.jobType = :jobType) AND " +
             "(:minSalary IS NULL OR j.salaryMax >= :minSalary) AND " +
-            "(j.status = 'OPEN') AND " +
+            "(j.status = com.xuanthi.talentmatchingbe.enums.JobStatus.OPEN) AND " +
             "(j.deadline IS NULL OR j.deadline > CURRENT_TIMESTAMP)")
     Page<Job> findJobsWithFilters(
-            String title,
-            String location,
-            JobType jobType,
-            BigDecimal minSalary,
+            @Param("title") String title,
+            @Param("location") String location,
+            @Param("jobType") JobType jobType,
+            @Param("minSalary") BigDecimal minSalary,
             Pageable pageable);
 
-    // Lấy Job theo ID Công ty (thông qua User), điều kiện: Job phải đang OPEN
-    @Query("SELECT j FROM Job j WHERE j.employer.company.id = :companyId AND j.status = 'OPEN'")
-    Page<Job> findActiveJobsByCompany(@Param("companyId") Long companyId, Pageable pageable);
+    // 🔥 ĐỔI TÊN HÀM: Từ findActiveJobs... thành findOpenJobs...
+    @Query("SELECT j FROM Job j WHERE j.employer.company.id = :companyId AND j.status = com.xuanthi.talentmatchingbe.enums.JobStatus.OPEN")
+    Page<Job> findOpenJobsByCompany(@Param("companyId") Long companyId, Pageable pageable);
 
-    // Dùng cho ô Search: Tìm Job theo ID Công ty VÀ Tên công việc
+    // 🔥 ĐỔI TÊN HÀM: Từ searchActiveJobs... thành searchOpenJobs...
     @Query("SELECT j FROM Job j WHERE j.employer.company.id = :companyId " +
-            "AND j.status = 'OPEN' AND LOWER(j.title) LIKE LOWER(CONCAT('%', :keyword, '%'))")
-    Page<Job> searchActiveJobsByCompany(@Param("companyId") Long companyId, @Param("keyword") String keyword, Pageable pageable);
+            "AND j.status = com.xuanthi.talentmatchingbe.enums.JobStatus.OPEN AND LOWER(j.title) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    Page<Job> searchOpenJobsByCompany(@Param("companyId") Long companyId, @Param("keyword") String keyword, Pageable pageable);
 }

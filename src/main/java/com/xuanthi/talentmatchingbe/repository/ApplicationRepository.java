@@ -59,4 +59,7 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
     @Query("SELECT a FROM Application a WHERE a.job.id = :jobId " +
             "ORDER BY a.matchScore DESC, a.appliedAt ASC")
     List<Application> findRankingByJobId(@Param("jobId") Long jobId);
+
+    // Bỏ cái OrderByAppliedAtDesc đi
+    Page<Application> findByJobId(Long jobId, Pageable pageable);
 }

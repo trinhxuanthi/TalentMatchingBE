@@ -1,15 +1,14 @@
 package com.xuanthi.talentmatchingbe.controller;
 
-import com.xuanthi.talentmatchingbe.dto.application.ApplicationResponse;
-import com.xuanthi.talentmatchingbe.dto.application.CandidateDashboardResponse;
-import com.xuanthi.talentmatchingbe.dto.application.EmployerDashboardResponse;
-import com.xuanthi.talentmatchingbe.dto.application.MonthlyStatResponse;
+import com.xuanthi.talentmatchingbe.dto.application.*;
 import com.xuanthi.talentmatchingbe.enums.ApplicationStatus;
 import com.xuanthi.talentmatchingbe.service.ApplicationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +27,13 @@ public class ApplicationController {
     // 1. LUỒNG ỨNG VIÊN (CANDIDATE)
     // ==========================================
 
+    @PostMapping("/apply")
+    @Operation(summary = "Ứng viên nộp đơn ứng tuyển",
+            description = "Luồng này sẽ chạy qua 'Máy chém' Java (Match 100% Skill) trước khi đẩy sang AI Python.")
+    public ResponseEntity<ApplicationResponse> applyForJob(@Valid @RequestBody CandidateApplyRequest request) {
+        ApplicationResponse response = applicationService.applyForJob(request);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
 
     @GetMapping("/my-applications")
     @PreAuthorize("hasRole('CANDIDATE')")
@@ -51,17 +57,18 @@ public class ApplicationController {
 
     @GetMapping("/job/{jobId}")
     @PreAuthorize("hasAnyRole('EMPLOYER', 'ADMIN')")
-    @Operation(summary = "Nhà tuyển dụng xem chi tiết toàn bộ hồ sơ của 1 JOB")
-    public ResponseEntity<Page<ApplicationResponse>> getByJob(
+    @Operation(summary = "Nhà tuyển dụng xem danh sách hồ sơ của 1 JOB (Sắp xếp theo điểm AI)")
+    public ResponseEntity<Page<ApplicationSimpleResponse>> getApplicationsByJob(
             @PathVariable Long jobId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size
+    ) {
         return ResponseEntity.ok(applicationService.getApplicationsByJob(jobId, page, size));
     }
 
     @PatchMapping("/{appId}/status")
     @PreAuthorize("hasAnyRole('EMPLOYER', 'ADMIN')")
-    @Operation(summary = "Nhà tuyển dụng Cập nhật trạng thái (Duyệt/Loại/Phỏng vấn) và thêm Ghi chú")
+    @Operation(summary = "Nhà tuyển dụng Cập nhật trạng thái và thêm Ghi chú")
     public ResponseEntity<String> updateStatus(
             @PathVariable Long appId,
             @RequestParam ApplicationStatus status,
@@ -70,7 +77,12 @@ public class ApplicationController {
         return ResponseEntity.ok("Cập nhật trạng thái ứng viên thành công!");
     }
 
-
+    @GetMapping("/{appId}/detail")
+    @PreAuthorize("hasAnyRole('EMPLOYER', 'ADMIN')")
+    @Operation(summary = "Xem chi tiết 1 đơn ứng tuyển (Bao gồm phân tích AI)")
+    public ResponseEntity<ApplicationResponse> getDetail(@PathVariable Long appId) {
+        return ResponseEntity.ok(applicationService.getApplicationDetail(appId));
+    }
 
     // ==========================================
     // 3. DASHBOARD NHÀ TUYỂN DỤNG
@@ -89,6 +101,4 @@ public class ApplicationController {
     public ResponseEntity<List<MonthlyStatResponse>> getMonthlyStats() {
         return ResponseEntity.ok(applicationService.getMonthlyStats());
     }
-
-
 }

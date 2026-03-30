@@ -1,7 +1,5 @@
 package com.xuanthi.talentmatchingbe.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xuanthi.talentmatchingbe.dto.job.JobRequest;
 import com.xuanthi.talentmatchingbe.dto.job.JobResponse;
 import com.xuanthi.talentmatchingbe.entity.Job;
@@ -21,10 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.Map;
 
-@Slf4j // Dùng cái này để ghi log lỗi nếu parse JSON thất bại
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class JobService {
@@ -32,25 +28,23 @@ public class JobService {
     private final JobRepository jobRepository;
     private final JobMapper jobMapper;
 
-    // BỔ SUNG: Dùng để biến List kỹ năng thành chuỗi JSON cho Python
-    private final ObjectMapper objectMapper;
-
     @Transactional
     public JobResponse createJob(JobRequest request) {
         User currentUser = SecurityUtils.getCurrentUser();
 
-        // 1. Map sang Entity
+        // 1. MapStruct tự động bê toàn bộ dữ liệu (kể cả List Kỹ năng) từ Request sang Entity
         Job job = jobMapper.toEntity(request);
 
-        // 2. Chế biến lương & JSON kỹ năng để lưu vào DB
-        enrichJobWithAiAndSalaryLogic(job, request);
+        // 2. Chế biến logic lương
+        applySalaryLogic(job);
 
+        // 3. Set quyền sở hữu và trạng thái (Mặc định là OPEN)
         job.setEmployer(currentUser);
         job.setStatus(JobStatus.OPEN);
 
+        // 4. Lưu DB (Converter tự biến List Skills thành chuỗi JSON/phẩy cất xuống DB)
         Job savedJob = jobRepository.save(job);
 
-        // 3. Trả về Response (Lúc này @AfterMapping trong Mapper sẽ tự chạy)
         return jobMapper.toResponse(savedJob);
     }
 
@@ -65,25 +59,23 @@ public class JobService {
             throw new RuntimeException("Bạn không có quyền chỉnh sửa bài đăng này!");
         }
 
-        // 1. Dùng Mapper để đổ dữ liệu mới từ request vào job hiện tại
+        // 1. Dùng MapStruct ghi đè dữ liệu mới vào Entity hiện tại (Status vẫn được giữ nguyên do @Mapping ignore)
         jobMapper.updateJobFromDto(request, job);
 
-        // 2. Cập nhật lại Logic AI (Vì HR có thể đã thay đổi kỹ năng yêu cầu)
-        enrichJobWithAiAndSalaryLogic(job, request);
+        // 2. Cập nhật lại Logic Lương
+        applySalaryLogic(job);
 
         return jobMapper.toResponse(jobRepository.save(job));
     }
 
     @Transactional
     public void deleteJob(Long jobId) {
-        // 1. Tìm Job cần xóa
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc với ID: " + jobId));
 
-        // 2. Thay vì dùng jobRepository.delete(job), ta chỉ cập nhật trạng thái thành DELETED
+        // Soft Delete: Chuyển trạng thái sang DELETED thay vì xóa hẳn dòng trong DB
         job.setStatus(JobStatus.DELETED);
 
-        // 3. Lưu lại vào Database
         jobRepository.save(job);
     }
 
@@ -111,71 +103,35 @@ public class JobService {
         return jobPage.map(jobMapper::toResponse);
     }
 
-    // ==============================================================
-    // HÀM HELPER: XỬ LÝ ĐẶC BIỆT CHO LÕI AI VÀ LƯƠNG THỎA THUẬN
-    // ==============================================================
-    private void enrichJobWithAiAndSalaryLogic(Job job, JobRequest request) {
-        // 1. Xử lý Lương (Quét sạch min/max nếu là lương thỏa thuận)
-        if (request.isSalaryNegotiable()) {
-            job.setSalaryNegotiable(true);
-            job.setSalaryMin(null);
-            job.setSalaryMax(null);
-        } else {
-            job.setSalaryNegotiable(false);
-            job.setSalaryMin(request.getSalaryMin());
-            job.setSalaryMax(request.getSalaryMax());
-        }
-
-        // 2. Xử lý Kỹ năng cho Python AI (Gán trọng số 3 và 1)
-        Map<String, Integer> aiSkillsMap = new HashMap<>();
-
-        if (request.getMustHaveSkills() != null) {
-            for (String skill : request.getMustHaveSkills()) {
-                aiSkillsMap.put(skill.trim().toLowerCase(), 3);
-            }
-        }
-
-        if (request.getNiceToHaveSkills() != null) {
-            for (String skill : request.getNiceToHaveSkills()) {
-                aiSkillsMap.putIfAbsent(skill.trim().toLowerCase(), 1); // Tránh ghi đè Must-have
-            }
-        }
-
-        try {
-            // Chuyển Map thành chuỗi JSON: {"java": 3, "docker": 1}
-            job.setRequiredSkills(objectMapper.writeValueAsString(aiSkillsMap));
-
-            // Chuyển List Danh mục thành chuỗi JSON: ["IT", "System Architect"]
-            if (request.getCategories() != null) {
-                job.setCategories(objectMapper.writeValueAsString(request.getCategories()));
-            }
-        } catch (JsonProcessingException e) {
-            log.error("Lỗi parse JSON dữ liệu AI", e);
-            throw new RuntimeException("Hệ thống gặp lỗi khi chuẩn hóa dữ liệu cho AI.");
-        }
-    }
-
-    // Lấy chi tiết 1 Job
     public JobResponse getJobById(Long jobId) {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc!"));
         return jobMapper.toResponse(job);
-        // Hàm toResponse này sẽ tự động chạy cái @AfterMapping để dịch JSON kỹ năng ra thành 2 List cho bạn!
     }
 
-    // Lấy danh sách việc làm của 1 Công ty (Dùng cho trang Chi tiết công ty)
     @Transactional(readOnly = true)
     public Page<JobResponse> getPublicJobsByCompany(Long companyId, String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         Page<Job> jobs;
 
+        // 🔥 Đã đổi tên hàm query để phản ánh đúng việc sử dụng JobStatus.OPEN
         if (keyword != null && !keyword.trim().isEmpty()) {
-            jobs = jobRepository.searchActiveJobsByCompany(companyId, keyword.trim(), pageable);
+            jobs = jobRepository.searchOpenJobsByCompany(companyId, keyword.trim(), pageable);
         } else {
-            jobs = jobRepository.findActiveJobsByCompany(companyId, pageable);
+            jobs = jobRepository.findOpenJobsByCompany(companyId, pageable);
         }
 
-        // jobMapper là class (hoặc code thủ công) chuyển từ Entity Job sang DTO JobResponse
         return jobs.map(jobMapper::toResponse);
+    }
+
+    // ==============================================================
+    // HÀM HELPER: XỬ LÝ ĐẶC BIỆT CHO LƯƠNG
+    // ==============================================================
+    private void applySalaryLogic(Job job) {
+        // Quét sạch min/max nếu là lương thỏa thuận
+        if (job.isSalaryNegotiable()) {
+            job.setSalaryMin(null);
+            job.setSalaryMax(null);
+        }
     }
 }

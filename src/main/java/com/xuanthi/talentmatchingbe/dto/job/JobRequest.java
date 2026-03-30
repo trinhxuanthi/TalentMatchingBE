@@ -1,8 +1,11 @@
 package com.xuanthi.talentmatchingbe.dto.job;
 
+import com.xuanthi.talentmatchingbe.enums.EducationLevel;
+import com.xuanthi.talentmatchingbe.enums.JobLevel;
 import com.xuanthi.talentmatchingbe.enums.JobType;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -35,11 +38,21 @@ public class JobRequest {
     @NotNull(message = "Hình thức làm việc không được để trống")
     private JobType jobType;
 
-    @NotBlank(message = "Kinh nghiệm yêu cầu không được để trống")
+    @NotBlank(message = "Kinh nghiệm hiển thị UI không được để trống")
     private String experienceLevel;
 
-    private String jobLevel;       // VD: "Quản lý / Giám sát"
-    private String educationLevel; // VD: "Đại học trở lên"
+    // 🔥 THÊM MỚI: Bắt Frontend truyền con số nguyên để Java xử lý
+    @NotNull(message = "Số năm kinh nghiệm tối thiểu không được để trống")
+    @Min(value = 0, message = "Số năm kinh nghiệm không được âm")
+    private Integer minExpYears;
+
+    // 🔥 CẬP NHẬT: Ép kiểu Enum
+    @NotNull(message = "Cấp bậc công việc không được để trống")
+    private JobLevel jobLevel;
+
+    // 🔥 CẬP NHẬT: Ép kiểu Enum
+    @NotNull(message = "Yêu cầu bằng cấp không được để trống")
+    private EducationLevel educationLevel;
 
     @Min(value = 1, message = "Số lượng tuyển tối thiểu là 1")
     private Integer quantity;
@@ -53,15 +66,14 @@ public class JobRequest {
     private String benefits; // Có thể null (nếu công ty keo kiệt không có phúc lợi) 😂
 
     // ==========================================
-    // 4. KHỐI DỮ LIỆU "NUÔI" ĐỘNG CƠ AI PYTHON
+    // 4. KHỐI DỮ LIỆU ĐIỀU KIỆN CỨNG & AI PYTHON
     // ==========================================
     @NotBlank(message = "Yêu cầu công việc (dành cho AI) không được để trống")
-    private String requirements; // Gửi thẳng cho SBERT chấm
+    private String requirements; // Gửi thẳng cho Gemini đọc
 
-    @NotNull(message = "Phải có ít nhất 1 kỹ năng bắt buộc để AI chấm điểm")
-    private List<String> mustHaveSkills; // Frontend gửi mảng: ["java", "spring"]
-
-    private List<String> niceToHaveSkills; // Mảng kỹ năng ưu tiên: ["docker", "redis"]
+    // 🔥 CẬP NHẬT: Chỉ dùng 1 List duy nhất cho kỹ năng bắt buộc
+    @NotEmpty(message = "Phải có ít nhất 1 kỹ năng bắt buộc để hệ thống đánh giá")
+    private List<String> requiredSkills;
 
     private List<String> categories; // Mảng danh mục nghề: ["IT", "Backend"]
 }

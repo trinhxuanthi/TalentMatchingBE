@@ -1,5 +1,8 @@
 package com.xuanthi.talentmatchingbe.entity;
 
+import com.xuanthi.talentmatchingbe.converter.StringListConverter;
+import com.xuanthi.talentmatchingbe.enums.EducationLevel;
+import com.xuanthi.talentmatchingbe.enums.JobLevel;
 import com.xuanthi.talentmatchingbe.enums.JobStatus;
 import com.xuanthi.talentmatchingbe.enums.JobType;
 import jakarta.persistence.*;
@@ -9,6 +12,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "jobs", indexes = {
@@ -50,44 +54,56 @@ public class Job {
     private LocalDateTime deadline;
 
     // ==========================================
-    // 2. KHỐI THÔNG TIN SIDEBAR (Chuẩn TopCV)
+    // 2. KHỐI THÔNG TIN SIDEBAR (Chuẩn UI & Logic)
     // ==========================================
     @Enumerated(EnumType.STRING)
     @Column(name = "job_type", length = 50)
-    private JobType jobType; // FULL_TIME, PART_TIME, REMOTE...
+    private JobType jobType;
 
+    // Cột để hiện text lên UI (VD: "2 - 3 năm kinh nghiệm")
     @Column(name = "experience_level")
-    private String experienceLevel; // VD: "Trên 5 năm kinh nghiệm"
+    private String experienceLevel;
 
-    @Column(name = "job_level")
-    private String jobLevel; // VD: "Quản lý / Giám sát", "Nhân viên"
+    // 🔥 Cột ẨN để chạy "Máy chém" Java Logic (VD: 2)
+    @Builder.Default
+    @Column(name = "min_exp_years", nullable = false)
+    private Integer minExpYears = 0;
 
-    @Column(name = "education_level")
-    private String educationLevel; // VD: "Đại học trở lên"
+    @Enumerated(EnumType.STRING)
+    @Column(name = "job_level", length = 50)
+    private JobLevel jobLevel;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "education_level", length = 50)
+    private EducationLevel educationLevel;
 
     @Column(name = "quantity")
-    private Integer quantity; // Số lượng tuyển: VD 2
+    private Integer quantity;
 
     // ==========================================
-    // 3. KHỐI VĂN BẢN CHI TIẾT (Hiển thị UI)
+    // 3. KHỐI VĂN BẢN CHI TIẾT (Cho ứng viên & AI đọc)
     // ==========================================
     @Column(columnDefinition = "TEXT", nullable = false)
-    private String description; // Mô tả công việc chung
+    private String description;
 
     @Column(columnDefinition = "TEXT")
-    private String benefits; // Quyền lợi ứng viên
+    private String benefits;
 
-    // ==========================================
-    // 4. KHỐI DỮ LIỆU DÀNH CHO LÕI AI PYTHON
-    // ==========================================
     @Column(name = "requirements", columnDefinition = "TEXT")
-    private String requirements; // Dành cho SBERT đọc (Mô tả chi tiết kinh nghiệm yêu cầu)
+    private String requirements;
 
+    // ==========================================
+    // 4. KHỐI ĐIỀU KIỆN CỨNG (Cho Frontend Tag Input & Java Máy Chém)
+    // ==========================================
+
+    // 🔥 ẢO THUẬT JPA: Nhận List từ Frontend, lưu String xuống MySQL
+    @Convert(converter = StringListConverter.class)
     @Column(name = "required_skills", columnDefinition = "TEXT")
-    private String requiredSkills; // Lưu JSON trọng số kỹ năng. VD: {"java": 3, "mysql": 1}
+    private List<String> requiredSkills;
 
+    @Convert(converter = StringListConverter.class)
     @Column(name = "categories", columnDefinition = "TEXT")
-    private String categories; // Lưu mảng JSON danh mục. VD: ["IT - Phần mềm", "System Architect"]
+    private List<String> categories;
 
     // ==========================================
     // 5. QUẢN LÝ TRẠNG THÁI & LIÊN KẾT
@@ -101,6 +117,7 @@ public class Job {
     @Column(name = "is_active")
     private boolean isActive = true;
 
+    // Liên kết với nhà tuyển dụng (Giữ nguyên của bro)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employer_id", nullable = false)
     private User employer;
