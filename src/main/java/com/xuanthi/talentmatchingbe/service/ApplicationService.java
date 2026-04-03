@@ -43,7 +43,6 @@ public class ApplicationService {
     private final ApplicationRepository applicationRepository;
     private final ApplicationMapper applicationMapper;
     private final NotificationService notificationService;
-    private final SkillAliasService skillAliasService;
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
 
@@ -99,8 +98,9 @@ public class ApplicationService {
     // ==============================================================
     // 2. GỌI PYTHON AI (Xử lý Bất đồng bộ cho ứng viên)
     // ==============================================================
-    @Async
+
     // Nho giu lai @Async de ham chay ngam, khong lam treo Frontend cua ung vien
+    @Async // Nhớ giữ nguyên @Async nếu bro đang cho nó chạy ngầm
     public void callPythonAiToEvaluate(Long applicationId, Long jobId) {
         log.info("[AI] Chuan bi goi Python Matcher cho Don ID: {}", applicationId);
 
@@ -113,12 +113,10 @@ public class ApplicationService {
             app.setIsAiScored(1);
             applicationRepository.save(app);
 
-            // Gom ky nang va tu dien vao truong custom_rules
-            Map<String, String> dynamicAliases = skillAliasService.getDynamicAliasesMap();
-            String aliasesJson = objectMapper.writeValueAsString(dynamicAliases);
+            // ĐÃ DỌN DẸP: Xóa sạch logic của skillAliasService
+            // Giờ chỉ truyền đúng Kỹ năng bắt buộc từ Job sang cho AI chấm
             String customRules = "Kỹ năng bắt buộc: " +
-                    (job.getRequiredSkills() != null ? String.join(", ", job.getRequiredSkills()) : "") +
-                    "\nTừ điển: " + aliasesJson;
+                    (job.getRequiredSkills() != null ? String.join(", ", job.getRequiredSkills()) : "");
 
             // Dong goi du lieu chuan Form-Data cho Python
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
