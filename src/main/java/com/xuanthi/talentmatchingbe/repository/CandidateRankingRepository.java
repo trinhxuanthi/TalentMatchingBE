@@ -1,5 +1,6 @@
 package com.xuanthi.talentmatchingbe.repository;
 
+
 import com.xuanthi.talentmatchingbe.entity.CandidateRanking;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

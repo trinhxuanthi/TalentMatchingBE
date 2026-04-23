@@ -17,7 +17,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 
 @Configuration
 @RequiredArgsConstructor
-public class WebSocketSecurityInterceptor implements WebSocketMessageBrokerConfigurer {
+public class    WebSocketSecurityInterceptor implements WebSocketMessageBrokerConfigurer {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;

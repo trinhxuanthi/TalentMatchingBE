@@ -6,62 +6,83 @@ import com.xuanthi.talentmatchingbe.dto.auth.LoginRequest;
 import com.xuanthi.talentmatchingbe.dto.user.UserResponse;
 import com.xuanthi.talentmatchingbe.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@Tag(name = "AuthController", description = "Các API liên quan đến Đăng nhập, Đăng ký và Token")
-
+@Slf4j
+@Validated
+@Tag(name = "Auth Controller", description = "APIs for user authentication and password management")
 public class AuthController {
+
     private final AuthService authService;
 
-    @Operation(summary = "Đăng ký tài khoản")
+    @Operation(summary = "Register new user account")
     @PostMapping("/register")
-    public UserResponse register(@Valid @RequestBody RegisterRequest request) {
-        return authService.register(request);
+    public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
+        log.info("User registration attempt - email: {}", request.getEmail());
+        UserResponse response = authService.register(request);
+        log.info("User registered successfully - email: {}", request.getEmail());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Operation(summary = "Đăng nhập")
+    @Operation(summary = "User login")
     @PostMapping("/login")
-    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
-        return authService.login(request);
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        log.info("Login attempt - email: {}", request.getEmail());
+        LoginResponse response = authService.login(request);
+        log.info("Login successful - email: {}", request.getEmail());
+        return ResponseEntity.ok(response);
     }
 
-
-    @Operation(summary = "Gửi OTP")
+    @Operation(summary = "Send OTP for password reset")
     @PostMapping("/forgot-password")
-    public ResponseEntity<String> forgot(@RequestParam String email) {
+    public ResponseEntity<Map<String, String>> forgotPassword(
+            @Parameter(description = "User email address", required = true)
+            @RequestParam @NotBlank @Email String email) {
+
+        log.info("Password reset request - email: {}", email);
         authService.requestForgotPassword(email);
-        return ResponseEntity.ok("OTP đã được gửi!");
+        return ResponseEntity.ok(Map.of("message", "OTP has been sent to your email!"));
     }
 
-    @Operation(summary = "Reset mật khẩu")
+    @Operation(summary = "Reset password with OTP")
     @PostMapping("/reset-password")
-    public ResponseEntity<String> reset(
-            @RequestParam String email,
-            @RequestParam String otp,
-            @RequestParam String newPassword) {
+    public ResponseEntity<Map<String, String>> resetPassword(
+            @RequestParam @NotBlank @Email String email,
+            @RequestParam @NotBlank String otp,
+            @RequestParam @NotBlank @Size(min = 6) String newPassword) {
+
+        log.info("Password reset attempt - email: {}", email);
         authService.verifyAndResetPassword(email, otp, newPassword);
-        return ResponseEntity.ok("Mật khẩu đã được cập nhật thành công!");
+        return ResponseEntity.ok(Map.of("message", "Password has been updated successfully!"));
     }
 
-    @Operation(summary = "Đổi mật khẩu")
+    @Operation(summary = "Change password for authenticated user")
     @PostMapping("/change-password")
-    public ResponseEntity<String> changePassword(
-            Principal principal, // Lấy email từ JWT Token đã đăng nhập
-            @RequestParam String oldPassword,
-            @RequestParam String newPassword) {
+    public ResponseEntity<Map<String, String>> changePassword(
+            Principal principal,
+            @RequestParam @NotBlank String oldPassword,
+            @RequestParam @NotBlank @Size(min = 6) String newPassword) {
 
         String email = principal.getName();
+        log.info("Password change attempt - email: {}", email);
         authService.changePassword(email, oldPassword, newPassword);
-
-        return ResponseEntity.ok("Đổi mật khẩu thành công!");
+        return ResponseEntity.ok(Map.of("message", "Password changed successfully!"));
     }
 }

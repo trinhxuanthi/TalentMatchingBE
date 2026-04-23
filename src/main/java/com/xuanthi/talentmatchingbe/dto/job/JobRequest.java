@@ -76,4 +76,6 @@ public class JobRequest {
     private List<String> requiredSkills;
 
     private List<String> categories; // Mảng danh mục nghề: ["IT", "Backend"]
+
+    private AiWeightDto aiSettings;
 }

@@ -15,33 +15,33 @@ import java.util.Optional;
 @Repository
 public interface ApplicationRepository extends JpaRepository<Application, Long> {
 
+    // ==========================================
+    // CÁC HÀM XÁC THỰC & BẢO MẬT
+    // ==========================================
     // Kiểm tra xem ứng viên đã nộp đơn vào Job này chưa (Chống Spam)
-    // Thêm check isActive để nếu họ đã rút đơn cũ thì mới được nộp đơn mới
     boolean existsByJobIdAndCandidateIdAndIsActiveTrue(Long jobId, Long candidateId);
 
-    // Cho Employer: Xem danh sách ứng viên nộp vào 1 Job cụ thể
-    Page<Application> findByJobIdOrderByAppliedAtDesc(Long jobId, Pageable pageable);
-
-    // Cho Candidate: Xem lại lịch sử các Job mình đã nộp
-    Page<Application> findByCandidateIdOrderByAppliedAtDesc(Long candidateId, Pageable pageable);
+    // Kiểm tra xem Email này đã nộp cho Job này bao giờ chưa?
+    boolean existsByJobIdAndEmail(Long jobId, String email);
 
     // Tìm đơn ứng tuyển kèm theo check quyền sở hữu (Để bảo mật khi update status)
     Optional<Application> findByIdAndJobEmployerId(Long appId, Long employerId);
 
-    // Đếm tổng số đơn của 1 ứng viên
+
+    // ==========================================
+    // CÁC HÀM THỐNG KÊ (ĐẾM SỐ LƯỢNG)
+    // ==========================================
     long countByCandidateId(Long candidateId);
 
-    // Đếm theo trạng thái cụ thể của ứng viên đó
     long countByCandidateIdAndStatus(Long candidateId, ApplicationStatus status);
 
-    // Đếm tổng số đơn nộp vào các Job của 1 Employer cụ thể
     long countByJobEmployerId(Long employerId);
 
-    // Đếm số đơn theo trạng thái cụ thể của 1 Employer
     long countByJobEmployerIdAndStatus(Long employerId, ApplicationStatus status);
 
-    // Đếm số đơn nộp vào 1 Job cụ thể
     long countByJobId(Long jobId);
+
+    // Đếm số đơn ứng tuyển theo trạng thái (Ví dụ: PENDING là chưa xem)
 
     @Query(value = "SELECT DATE_FORMAT(applied_at, '%Y-%m') as month, COUNT(*) as count " +
             "FROM applications a " +
@@ -52,14 +52,37 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
             "ORDER BY month ASC", nativeQuery = true)
     List<Object[]> getMonthlyStatsNative(Long employerId);
 
-    // Đếm số lượng đơn chưa xem của một Nhà tuyển dụng cụ thể
-    long countByJobEmployerIdAndIsViewedFalse(Long employerId);
 
-    // Chỉ lấy những đơn thuộc Job này và đã được chấm điểm, sắp xếp giảm dần
+    // ==========================================
+    // CÁC HÀM LẤY DANH SÁCH (CHO ỨNG VIÊN)
+    // ==========================================
+    // Cho Candidate: Xem lại lịch sử các Job mình đã nộp
+    Page<Application> findByCandidateIdOrderByAppliedAtDesc(Long candidateId, Pageable pageable);
+
+
+    // ==========================================
+    // 🔥 CÁC HÀM LẤY DANH SÁCH (CHO HR) - AUTO VIP LÊN TOP
+    // ==========================================
+
+    // 1. DÀNH CHO HR: Xem danh sách ứng viên (Ưu tiên PRO lên đầu, sau đó mới tính ngày nộp)
     @Query("SELECT a FROM Application a WHERE a.job.id = :jobId " +
-            "ORDER BY a.matchScore DESC, a.appliedAt ASC")
-    List<Application> findRankingByJobId(@Param("jobId") Long jobId);
+            "ORDER BY CASE WHEN a.candidate.accountType = 'PRO' THEN 1 ELSE 2 END ASC, " +
+            "a.appliedAt DESC")
+    Page<Application> findByJobIdPriority(@Param("jobId") Long jobId, Pageable pageable);
 
-    // Bỏ cái OrderByAppliedAtDesc đi
-    Page<Application> findByJobId(Long jobId, Pageable pageable);
+    // 2. DÀNH CHO HR: Xem bảng xếp hạng AI (Ưu tiên PRO lên đầu, sau đó tính điểm AI, cuối cùng là ngày nộp)
+    @Query("SELECT a FROM Application a WHERE a.job.id = :jobId " +
+            "ORDER BY CASE WHEN a.candidate.accountType = 'PRO' THEN 1 ELSE 2 END ASC, " +
+            "a.matchScore DESC, " +
+            "a.appliedAt ASC")
+    List<Application> findRankingByJobIdPriority(@Param("jobId") Long jobId);
+
+
+    // Tính tỉ lệ Matching thành công (Tính trung bình điểm AI của những người ĐÃ TRÚNG TUYỂN)
+    @Query("SELECT AVG(a.matchScore) FROM Application a WHERE a.status = 'ACCEPTED'")
+    Double getAverageSuccessfulMatchingScore();
+
+    // Đếm số lượng đơn theo từng trạng thái (ACCEPTED, REJECTED, PENDING...)
+    @Query("SELECT a.status, COUNT(a) FROM Application a GROUP BY a.status")
+    List<Object[]> getStatusDistribution();
 }

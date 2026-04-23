@@ -75,4 +75,6 @@ public class JobResponse {
     private String employerName;
     private String employerAvatar;
     private String employerEmail;
+    private AiWeightDto aiSettings;
+    private boolean isPriority;
 }

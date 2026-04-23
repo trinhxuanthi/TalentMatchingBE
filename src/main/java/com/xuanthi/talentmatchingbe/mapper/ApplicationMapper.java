@@ -23,7 +23,6 @@ public interface ApplicationMapper {
     @Mapping(target = "aiRecommendation", ignore = true) // Them truong nay: Bo qua vi luc moi nop don AI chua cham
     @Mapping(target = "isAiScored", ignore = true)
     @Mapping(target = "notes", ignore = true)
-    @Mapping(target = "isViewed", ignore = true)
     @Mapping(target = "appliedAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     Application toEntity(CandidateApplyRequest request);
@@ -36,6 +35,7 @@ public interface ApplicationMapper {
     @Mapping(target = "candidateId", source = "candidate.id")
     @Mapping(target = "candidateFullName", source = "fullName")
     @Mapping(target = "candidateEmail", source = "email")
+    @Mapping(target = "isCandidatePro", expression = "java(application.getCandidate() != null && application.getCandidate().isPro())")
     // FIX QUAN TRONG: Đã xóa dòng @Mapping(target = "aiRecommendation", ignore = true)
     // MapStruct se tu dong map aiRecommendation va aiAnalysis tu Entity sang DTO vi chung da trung ten.
     ApplicationResponse toResponse(Application application);
@@ -46,6 +46,7 @@ public interface ApplicationMapper {
     @Mapping(target = "candidateId", source = "candidate.id")
     @Mapping(target = "candidateFullName", source = "fullName")
     @Mapping(target = "candidateEmail", source = "email")
+    @Mapping(target = "isCandidatePro", expression = "java(application.getCandidate() != null && application.getCandidate().isPro())")
     ApplicationSimpleResponse toSimpleResponse(Application application);
 
     // ==========================================

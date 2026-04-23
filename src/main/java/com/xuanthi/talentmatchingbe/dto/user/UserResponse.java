@@ -18,6 +18,8 @@ public class UserResponse {
     private String phoneNumber;
     private String provider;
     private String cvUrl;
+    private String companyId;
+    private String companyAvatar;
     @JsonProperty("isActive")
     private boolean isActive;
 }

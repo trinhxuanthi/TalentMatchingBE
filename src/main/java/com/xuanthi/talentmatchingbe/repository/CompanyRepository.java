@@ -23,6 +23,8 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
     // Kiểm tra xem mã số thuế đã tồn tại chưa (Chống spam 1 cty đk nhiều tk)
     boolean existsByTaxCode(String taxCode);
 
+    boolean existsByName(String name);
+
     Page<Company> findByNameContainingIgnoreCaseAndApprovalStatus(String name, String approvalStatus, Pageable pageable);
 
     Optional<Company> findByIdAndApprovalStatus(Long id, String approvalStatus);

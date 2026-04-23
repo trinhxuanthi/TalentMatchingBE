@@ -1,12 +1,12 @@
 package com.xuanthi.talentmatchingbe.controller;
 
 import com.xuanthi.talentmatchingbe.dto.application.*;
-import com.xuanthi.talentmatchingbe.enums.ApplicationStatus;
 import com.xuanthi.talentmatchingbe.service.ApplicationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,11 +14,13 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/applications")
 @RequiredArgsConstructor
-@Tag(name = "ApplicationController", description = "Các API liên quan đến Apply CV và Quản lý Ứng viên")
+@Slf4j
+@Tag(name = "Application Controller", description = "Các API liên quan đến Apply CV và Quản lý Ứng viên")
 public class ApplicationController {
 
     private final ApplicationService applicationService;
@@ -31,6 +33,7 @@ public class ApplicationController {
     @Operation(summary = "Ứng viên nộp đơn ứng tuyển",
             description = "Luồng này sẽ chạy qua 'Máy chém' Java (Match 100% Skill) trước khi đẩy sang AI Python.")
     public ResponseEntity<ApplicationResponse> applyForJob(@Valid @RequestBody CandidateApplyRequest request) {
+        // ✅ Đã xóa try-catch: Để GlobalExceptionHandler xử lý lỗi nộp trùng/lọc cứng
         ApplicationResponse response = applicationService.applyForJob(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
@@ -67,20 +70,23 @@ public class ApplicationController {
     }
 
     @PatchMapping("/{appId}/status")
-    @PreAuthorize("hasAnyRole('EMPLOYER', 'ADMIN')")
-    @Operation(summary = "Nhà tuyển dụng Cập nhật trạng thái và thêm Ghi chú")
-    public ResponseEntity<String> updateStatus(
+    @PreAuthorize("hasRole('EMPLOYER')")
+    @Operation(summary = "HR Cập nhật trạng thái và thêm ghi chú (Chuẩn Request Body)")
+    public ResponseEntity<Map<String, String>> updateApplicationStatus(
             @PathVariable Long appId,
-            @RequestParam ApplicationStatus status,
-            @RequestParam(required = false) String notes) {
-        applicationService.updateStatus(appId, status, notes);
-        return ResponseEntity.ok("Cập nhật trạng thái ứng viên thành công!");
+            @Valid @RequestBody UpdateStatusRequest request) { // ✅ Nhận 1 cục JSON thay vì Query Param
+
+        // Gọi Service xử lý
+        applicationService.updateStatus(appId, request.getStatus(), request.getNotes());
+
+        return ResponseEntity.ok(Map.of("message", "Đã cập nhật trạng thái hồ sơ thành công!"));
     }
 
     @GetMapping("/{appId}/detail")
     @PreAuthorize("hasAnyRole('EMPLOYER', 'ADMIN')")
     @Operation(summary = "Xem chi tiết 1 đơn ứng tuyển (Bao gồm phân tích AI)")
     public ResponseEntity<ApplicationResponse> getDetail(@PathVariable Long appId) {
+        // ✅ Đã xóa try-catch
         return ResponseEntity.ok(applicationService.getApplicationDetail(appId));
     }
 
@@ -92,6 +98,7 @@ public class ApplicationController {
     @PreAuthorize("hasRole('EMPLOYER')")
     @Operation(summary = "Số liệu Dashboard tổng quan của Employer")
     public ResponseEntity<EmployerDashboardResponse> getEmployerStats() {
+        // ✅ Đã xóa try-catch
         return ResponseEntity.ok(applicationService.getEmployerStats());
     }
 
@@ -99,6 +106,17 @@ public class ApplicationController {
     @PreAuthorize("hasRole('EMPLOYER')")
     @Operation(summary = "Số liệu biểu đồ CV đã nộp theo tháng của Employer")
     public ResponseEntity<List<MonthlyStatResponse>> getMonthlyStats() {
+        // ✅ Đã xóa try-catch
         return ResponseEntity.ok(applicationService.getMonthlyStats());
+    }
+
+    @PatchMapping("/{id}/withdraw")
+    @PreAuthorize("hasRole('CANDIDATE')")
+    @Operation(summary = "Ứng viên rút đơn ứng tuyển (Chỉ được phép khi HR chưa xem)")
+    public ResponseEntity<Map<String, String>> withdrawApplication(@PathVariable Long id) {
+
+        String message = applicationService.withdrawApplication(id);
+
+        return ResponseEntity.ok(Map.of("message", message));
     }
 }

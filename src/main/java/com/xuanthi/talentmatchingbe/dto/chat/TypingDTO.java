@@ -2,9 +2,25 @@ package com.xuanthi.talentmatchingbe.dto.chat;
 
 import lombok.Data;
 
+/**
+ * DTO cho trạng thái typing (đang gõ phím)
+ * Sử dụng cho WebSocket real-time chat
+ */
 @Data
 public class TypingDTO {
+
+    /**
+     * ID của conversation
+     */
     private Long conversationId;
-    private String receiverEmail; // Bắn sự kiện gõ phím cho ai?
-    private boolean isTyping;     // true = đang gõ, false = ngừng gõ
+
+    /**
+     * Email của người nhận thông báo typing
+     */
+    private String receiverEmail;
+
+    /**
+     * Trạng thái typing: true = đang gõ, false = ngừng gõ
+     */
+    private boolean isTyping;
 }

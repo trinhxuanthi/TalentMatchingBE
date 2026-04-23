@@ -9,89 +9,112 @@ import com.xuanthi.talentmatchingbe.repository.UserRepository;
 import com.xuanthi.talentmatchingbe.service.CompanyService;
 import com.xuanthi.talentmatchingbe.service.UploadService;
 import com.xuanthi.talentmatchingbe.service.UserService;
+import com.xuanthi.talentmatchingbe.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@Tag(name = "UserController", description = "Các API liên quan đến thông tin ngời dùng")
+@Slf4j
+@Validated
+@Tag(name = "User Controller", description = "APIs for user profile and management")
 public class UserController {
+
     private final UserService userService;
     private final UploadService uploadService;
     private final UserRepository userRepository;
     private final CompanyService companyService;
-    @Operation(summary = "Xem thông tin cá nhân")
+
+    @Operation(summary = "Get current user profile")
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getMyProfile() {
+        log.debug("Get profile request");
         return ResponseEntity.ok(userService.getMyProfile());
     }
 
-    @Operation(summary = "Thêm hoặc cập nhật avatar")
-    @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) // consumes = MediaType.MULTIPART_FORM_DATA_VALUE là hiện nu chọn file trên Swagger
-    public ResponseEntity<String> updateAvatar(@RequestParam("file") MultipartFile file) throws IOException {
-        // Lấy email người dùng hiện tại từ Token
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+    @Operation(summary = "Upload/update user avatar")
+    @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @SneakyThrows
+    public ResponseEntity<Map<String, String>> updateAvatar(
+            @Parameter(description = "Avatar image file")
+            @RequestParam("file") MultipartFile file) {
 
-        // Upload ảnh lên Cloudinary
+        log.debug("Avatar upload request - file: {}", file.getOriginalFilename());
+
+        // ✅ Dùng bùa SecurityUtils: Thay thế 10 dòng lấy Auth rắc rối
+        User currentUser = SecurityUtils.getRequiredCurrentUser();
+
+        // Upload image to Cloudinary (Lỗi IO/Cloudinary cứ để Handler lo)
         String avatarUrl = uploadService.uploadAvatar(file);
 
-        // Cập nhật URL vào Database
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
-        user.setAvatar(avatarUrl);
-        userRepository.save(user);
+        // Update URL
+        currentUser.setAvatar(avatarUrl);
+        userRepository.save(currentUser);
 
-        return ResponseEntity.ok(avatarUrl);
+        log.info("Avatar updated successfully for user: {}", currentUser.getEmail());
+        return ResponseEntity.ok(Map.of("avatarUrl", avatarUrl));
     }
 
-    @Operation(summary = "Cập nhật thông tin cá nhân")
+    @Operation(summary = "Update current user profile")
     @PutMapping("/me")
     public ResponseEntity<UserResponse> updateProfile(@Valid @RequestBody UserUpdateRequest request) {
+        log.debug("Update profile request");
         return ResponseEntity.ok(userService.updateProfile(request));
     }
 
-    @Operation(summary = "Người dùng xin làm Employer")
+    @Operation(summary = "Request upgrade to employer")
     @PreAuthorize("hasRole('CANDIDATE')")
     @PostMapping("/request-upgrade")
-    public ResponseEntity<String> requestUpgradeToEmployer(@Valid @RequestBody EmployerUpgradeRequest request) {
-        // Chỉ gọi đúng 1 dòng Service
+    public ResponseEntity<Map<String, String>> requestUpgradeToEmployer(@Valid @RequestBody EmployerUpgradeRequest request) {
+        log.info("Employer upgrade request from user");
         String result = companyService.requestUpgradeToEmployer(request);
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(Map.of("message", result));
     }
 
-    @Operation(summary = "Lấy các yêu cầu đang chờ xét duyệt lên Employer")
+    @Operation(summary = "Get pending company approval requests (Admin only)")
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/pending")
     public ResponseEntity<List<AdminCompanyResponse>> getPendingCompanies() {
-        // Đổi kiểu trả về thành DTO
+        log.debug("Get pending companies request");
         return ResponseEntity.ok(companyService.getPendingCompanies());
     }
 
-    @Operation(summary = "Duyệt làm Employer")
+    @Operation(summary = "Approve company request (Admin only)")
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{companyId}/approve")
-    public ResponseEntity<String> approveCompany(@PathVariable Long companyId) {
-        return ResponseEntity.ok(companyService.approveCompany(companyId));
+    public ResponseEntity<Map<String, String>> approveCompany(
+            @PathVariable @Min(1) Long companyId) {
+
+        log.info("Approve company request for companyId: {}", companyId);
+        String result = companyService.approveCompany(companyId);
+        return ResponseEntity.ok(Map.of("message", result));
     }
 
-    @Operation(summary = "Từ chối làm Employer")
+    @Operation(summary = "Reject company request (Admin only)")
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{companyId}/reject")
-    public ResponseEntity<String> rejectCompany(
-            @PathVariable Long companyId,
+    public ResponseEntity<Map<String, String>> rejectCompany(
+            @PathVariable @Min(1) Long companyId,
             @RequestParam String reason) {
-        return ResponseEntity.ok(companyService.rejectCompany(companyId, reason));
+
+        log.info("Reject company request for companyId: {} with reason: {}", companyId, reason);
+        String result = companyService.rejectCompany(companyId, reason);
+        return ResponseEntity.ok(Map.of("message", result));
     }
 }

@@ -1,26 +1,35 @@
 package com.xuanthi.talentmatchingbe.repository;
 
 import com.xuanthi.talentmatchingbe.entity.Message;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
-import java.util.List;
-
-@Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
-    // Lấy lịch sử tin nhắn của 1 phòng chat, sắp xếp theo thời gian cũ -> mới (để render từ trên xuống dưới)
-    List<Message> findByConversationIdOrderByCreatedAtAsc(Long conversationId);
+    // 🔥 TỐI ƯU: Phân trang + JOIN FETCH Sender (Sắp xếp DESC để lấy tin mới nhất trước)
+    @Query("SELECT m FROM Message m JOIN FETCH m.sender " +
+            "WHERE m.conversation.id = :conversationId " +
+            "ORDER BY m.createdAt DESC")
+    Page<Message> findMessagesByConversationId(@Param("conversationId") Long conversationId, Pageable pageable);
 
-    // 1. Chuyển tất cả tin nhắn của NGƯỜI KIA gửi cho MÌNH thành Đã Đọc
-    @Modifying // Bắt buộc phải có khi dùng lệnh UPDATE trong Spring Data JPA
-    @Query("UPDATE Message m SET m.isRead = true WHERE m.conversation.id = :conversationId AND m.sender.id != :myUserId AND m.isRead = false")
+    // Đánh dấu đã đọc (Chỉ update những tin do NGƯỜI KHÁC gửi cho mình)
+    @Modifying
+    @Query("UPDATE Message m SET m.isRead = true " +
+            "WHERE m.conversation.id = :conversationId AND m.sender.id != :myUserId AND m.isRead = false")
     void markMessagesAsRead(@Param("conversationId") Long conversationId, @Param("myUserId") Long myUserId);
 
-    // 2. Đếm tổng số tin nhắn chưa đọc của TÔI (dùng để hiển thị cục màu đỏ ở thanh Menu)
-    @Query("SELECT COUNT(m) FROM Message m WHERE (m.conversation.employer.id = :myUserId OR m.conversation.candidate.id = :myUserId) AND m.sender.id != :myUserId AND m.isRead = false")
+    // Đếm tin nhắn chưa đọc TRONG 1 PHÒNG CỤ THỂ
+    @Query("SELECT COUNT(m) FROM Message m " +
+            "WHERE m.conversation.id = :conversationId AND m.sender.id != :myUserId AND m.isRead = false")
+    long countUnreadInConversation(@Param("conversationId") Long conversationId, @Param("myUserId") Long myUserId);
+
+    // Đếm TỔNG SỐ tin nhắn chưa đọc của toàn bộ hệ thống (Cho icon cái chuông)
+    @Query("SELECT COUNT(m) FROM Message m JOIN m.conversation c " +
+            "WHERE (c.employer.id = :myUserId OR c.candidate.id = :myUserId) " +
+            "AND m.sender.id != :myUserId AND m.isRead = false")
     long countTotalUnreadMessages(@Param("myUserId") Long myUserId);
 }

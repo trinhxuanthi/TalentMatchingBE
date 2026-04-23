@@ -10,121 +10,147 @@ import com.xuanthi.talentmatchingbe.repository.ConversationRepository;
 import com.xuanthi.talentmatchingbe.repository.MessageRepository;
 import com.xuanthi.talentmatchingbe.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ChatService {
 
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
 
+    // ==============================================================
+    // 1. TÍNH NĂNG MỚI: KHỞI TẠO HOẶC LẤY PHÒNG CHAT
+    // ==============================================================
     @Transactional
-    public ChatMessageDTO saveMessage(ChatMessageDTO chatMessageDTO) {
-        // 1. Tìm người gửi và người nhận
-        User sender = userRepository.findByEmail(chatMessageDTO.getSenderEmail())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người gửi"));
-        User receiver = userRepository.findByEmail(chatMessageDTO.getReceiverEmail())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người nhận"));
+    public ConversationDTO getOrCreateConversation(Long myUserId, Long partnerId) {
+        User me = userRepository.findById(myUserId).orElseThrow(() -> new RuntimeException("Lỗi xác thực"));
+        User partner = userRepository.findById(partnerId).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
-        // 🔥 BẢO VỆ DỮ LIỆU: Ngăn chặn 2 người cùng Role tạo phòng chat bậy bạ
-        if (sender.getRole() == receiver.getRole()) {
-            throw new RuntimeException("Lỗi Logic: Hai người dùng cùng vai trò không thể tạo phòng chat!");
+        if (me.getRole() == partner.getRole()) {
+            throw new RuntimeException("Hai người dùng cùng vai trò không thể chat với nhau!");
         }
 
-        // 2. Xác định phòng chat (Tìm phòng cũ hoặc tạo phòng mới)
+        Conversation conv = conversationRepository.findExistingConversation(myUserId, partnerId)
+                .orElseGet(() -> {
+                    Conversation newConv = new Conversation();
+                    if (me.getRole() == Role.EMPLOYER) {
+                        newConv.setEmployer(me);
+                        newConv.setCandidate(partner);
+                    } else {
+                        newConv.setEmployer(partner);
+                        newConv.setCandidate(me);
+                    }
+                    return conversationRepository.save(newConv);
+                });
+
+        return ConversationDTO.builder()
+                .id(conv.getId())
+                .partnerId(partner.getId())
+                .partnerName(partner.getFullName())
+                .partnerAvatar(partner.getAvatar())
+                .partnerEmail(partner.getEmail())
+                .lastMessage(conv.getLastMessage())
+                .updatedAt(conv.getUpdatedAt())
+                .unreadCount(messageRepository.countUnreadInConversation(conv.getId(), myUserId))
+                .build();
+    }
+
+    // ==============================================================
+    // 2. LƯU TIN NHẮN (GIỮ NGUYÊN LOGIC SẾP, TỐI ƯU CODE)
+    // ==============================================================
+    @Transactional
+    public ChatMessageDTO saveMessage(ChatMessageDTO dto) {
+        if (dto == null || !StringUtils.hasText(dto.getSenderEmail()) ||
+                !StringUtils.hasText(dto.getReceiverEmail()) || !StringUtils.hasText(dto.getContent())) {
+            throw new IllegalArgumentException("Dữ liệu tin nhắn không hợp lệ!");
+        }
+
+        User sender = userRepository.findByEmail(dto.getSenderEmail()).orElseThrow();
+        User receiver = userRepository.findByEmail(dto.getReceiverEmail()).orElseThrow();
+
         Conversation conversation;
-        if (chatMessageDTO.getConversationId() != null) {
-            conversation = conversationRepository.findById(chatMessageDTO.getConversationId())
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng chat"));
+        if (dto.getConversationId() != null) {
+            conversation = conversationRepository.findById(dto.getConversationId()).orElseThrow();
         } else {
-            // Nếu chưa có ID phòng chat, thử tìm xem 2 người này đã chat chưa
             conversation = conversationRepository.findExistingConversation(sender.getId(), receiver.getId())
-                    .orElseGet(() -> {
-                        // Nếu chưa từng chat -> Tạo phòng chat mới
-                        Conversation newConv = new Conversation();
-                        if (sender.getRole() == Role.EMPLOYER) {
-                            newConv.setEmployer(sender);
-                            newConv.setCandidate(receiver);
-                        } else {
-                            newConv.setEmployer(receiver);
-                            newConv.setCandidate(sender);
-                        }
-                        return conversationRepository.save(newConv);
-                    });
+                    .orElseThrow(() -> new RuntimeException("Phòng chat chưa được khởi tạo!"));
         }
 
-        // 3. Tạo và lưu Tin nhắn (Message)
         Message message = Message.builder()
                 .conversation(conversation)
                 .sender(sender)
-                .content(chatMessageDTO.getContent())
+                .content(dto.getContent())
                 .isRead(false)
                 .build();
         message = messageRepository.save(message);
 
-        // 4. Cập nhật "Tin nhắn cuối cùng" cho Phòng chat
-        conversation.setLastMessage(chatMessageDTO.getContent());
+        conversation.setLastMessage(dto.getContent());
         conversationRepository.save(conversation);
 
-        // 5. Trả về DTO đã được gắn thêm thông tin để Frontend hiển thị real-time
-        chatMessageDTO.setId(message.getId());
-        chatMessageDTO.setConversationId(conversation.getId());
-        chatMessageDTO.setSenderId(sender.getId());
-        chatMessageDTO.setCreatedAt(message.getCreatedAt());
-        return chatMessageDTO;
+        dto.setId(message.getId());
+        dto.setConversationId(conversation.getId());
+        dto.setSenderId(sender.getId());
+        dto.setCreatedAt(message.getCreatedAt());
+        return dto;
     }
 
     // ==============================================================
-    // 🔥 FIX LỖI JSON: DÙNG DTO CHO API REST ĐỂ TỐI ƯU TỐC ĐỘ
+    // 3. DANH SÁCH PHÒNG CHAT (CÓ ĐẾM SỐ TIN CHƯA ĐỌC)
     // ==============================================================
-
     @Transactional(readOnly = true)
     public List<ConversationDTO> getMyConversations(Long userId) {
-        List<Conversation> conversations = conversationRepository.findAllByUserId(userId);
+        // Dùng hàm Optimized để né lỗi N+1
+        List<Conversation> conversations = conversationRepository.findAllByUserIdOptimized(userId);
 
         return conversations.stream().map(conv -> {
-            // Xác định "Đối tác" chat của mình là ai để lấy tên và ảnh đại diện
             User partner = conv.getEmployer().getId().equals(userId) ? conv.getCandidate() : conv.getEmployer();
+            // Lấy số tin chưa đọc cho TỪNG phòng
+            long unread = messageRepository.countUnreadInConversation(conv.getId(), userId);
 
             return ConversationDTO.builder()
                     .id(conv.getId())
                     .partnerId(partner.getId())
-                    .partnerName(partner.getFullName()) // Lấy tên người chat cùng
-                    .partnerAvatar(partner.getAvatar()) // Lấy ảnh người chat cùng
-                    .partnerEmail(partner.getEmail())   // 🔥 ĐÃ SỬA: Bỏ chữ "set" đi nha bro!
+                    .partnerName(partner.getFullName())
+                    .partnerAvatar(partner.getAvatar())
+                    .partnerEmail(partner.getEmail())
                     .lastMessage(conv.getLastMessage())
-                    .updatedAt(conv.getUpdatedAt())     // Thời gian tin nhắn cuối
+                    .updatedAt(conv.getUpdatedAt())
+                    .unreadCount(unread) // 🚀 Gắn số vào đây
                     .build();
         }).collect(Collectors.toList());
     }
 
+    // ==============================================================
+    // 4. LỊCH SỬ TIN NHẮN (ĐÃ TÍCH HỢP PHÂN TRANG)
+    // ==============================================================
     @Transactional(readOnly = true)
-    public List<ChatMessageDTO> getChatHistory(Long conversationId) {
-        // 1. Query lấy lịch sử tin nhắn
-        List<Message> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
+    public Page<ChatMessageDTO> getChatHistory(Long conversationId, int page, int size) {
+        // Sắp xếp DESC trong DB để lấy tin mới nhất, PageRequest lo phần còn lại
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Message> messagePage = messageRepository.findMessagesByConversationId(conversationId, pageable);
 
-        // Xử lý list rỗng để tránh lỗi NullPointer
-        if (messages.isEmpty()) {
-            return new ArrayList<>();
+        if (messagePage.isEmpty()) {
+            return Page.empty();
         }
 
-        // 🔥 TỐI ƯU HÓA: Lấy thông tin phòng chat 1 lần duy nhất ở ngoài vòng lặp
-        Conversation conv = messages.get(0).getConversation();
+        Conversation conv = messagePage.getContent().get(0).getConversation();
         User employer = conv.getEmployer();
         User candidate = conv.getCandidate();
 
-        // 2. Map sang DTO
-        return messages.stream().map(msg -> {
-            // Xác định người nhận: Nếu người gửi là Employer thì người nhận là Candidate, và ngược lại
+        return messagePage.map(msg -> {
             User receiver = msg.getSender().getId().equals(employer.getId()) ? candidate : employer;
-
             return ChatMessageDTO.builder()
                     .id(msg.getId())
                     .conversationId(conv.getId())
@@ -133,11 +159,14 @@ public class ChatService {
                     .content(msg.getContent())
                     .isRead(msg.isRead())
                     .createdAt(msg.getCreatedAt())
-                    .receiverEmail(receiver.getEmail()) // 🔥 Đã lấy được email người nhận chuẩn xác
+                    .receiverEmail(receiver.getEmail())
                     .build();
-        }).collect(Collectors.toList());
+        });
     }
 
+    // ==============================================================
+    // 5. CÁC HÀM TIỆN ÍCH (ĐÁNH DẤU ĐỌC, ĐẾM TỔNG)
+    // ==============================================================
     @Transactional
     public void markConversationAsRead(Long conversationId, Long myUserId) {
         messageRepository.markMessagesAsRead(conversationId, myUserId);

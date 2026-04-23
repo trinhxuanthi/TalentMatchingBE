@@ -3,12 +3,13 @@ package com.xuanthi.talentmatchingbe.mapper;
 import com.xuanthi.talentmatchingbe.dto.job.JobRequest;
 import com.xuanthi.talentmatchingbe.dto.job.JobResponse;
 import com.xuanthi.talentmatchingbe.entity.Job;
+import org.mapstruct.CollectionMappingStrategy;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
 // Không cần abstract class hay ObjectMapper nữa, dùng interface là đủ!
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", collectionMappingStrategy = CollectionMappingStrategy.ACCESSOR_ONLY)
 public interface JobMapper {
 
     // ==========================================
@@ -30,6 +31,8 @@ public interface JobMapper {
     @Mapping(source = "employer.avatar", target = "employerAvatar")
     @Mapping(source = "employer.email", target = "employerEmail")
     // Dùng biểu thức tính toán xem tin đã hết hạn chưa
+    @Mapping(source = "aiJobSetting", target = "aiSettings")
+    @Mapping(source = "priority", target = "isPriority")
     @Mapping(target = "isExpired", expression = "java(job.getDeadline() != null && job.getDeadline().isBefore(java.time.LocalDateTime.now()))")
     JobResponse toResponse(Job job);
 
@@ -41,5 +44,7 @@ public interface JobMapper {
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "requiredSkills", ignore = true)
+    @Mapping(target = "categories", ignore = true)
     void updateJobFromDto(JobRequest request, @MappingTarget Job job);
 }

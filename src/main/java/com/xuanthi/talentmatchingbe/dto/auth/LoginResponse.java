@@ -11,4 +11,6 @@ import lombok.*;
 public class LoginResponse {
     private String token;
     private UserResponse user;
+    private String urlAvatarCompany;
+    private Long idCompany; // Thêm thông tin công ty nếu người dùng là employer
 }

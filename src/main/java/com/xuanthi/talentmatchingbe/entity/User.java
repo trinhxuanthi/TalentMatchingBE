@@ -1,5 +1,6 @@
 package com.xuanthi.talentmatchingbe.entity;
 
+import com.xuanthi.talentmatchingbe.enums.AccountType;
 import com.xuanthi.talentmatchingbe.enums.Role;
 import jakarta.persistence.*;
 import lombok.*;
@@ -78,6 +79,9 @@ public class User implements UserDetails {
 
     private LocalDateTime cvUpdatedAt;
 
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private CandidateProfile candidateProfile;
+
     // TỐI ƯU: mappedBy phải khớp với tên biến 'employer' bên class Job
     // cascade = ALL: Nếu xóa User thì xóa luôn các Job của họ (tùy nghiệp vụ)
     // orphanRemoval: Tự động dọn dẹp các Job không còn chủ sở hữu
@@ -118,4 +122,24 @@ public class User implements UserDetails {
 
     @Override
     public boolean isCredentialsNonExpired() { return true; }
+
+    // Mặc định tạo tài khoản mới sẽ là BASIC
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_type", nullable = false)
+    @Builder.Default
+    private AccountType accountType = AccountType.BASIC;
+
+    // Ngày hết hạn gói PRO (nếu null tức là chưa mua hoặc mua vĩnh viễn)
+    @Column(name = "pro_expired_at")
+    private LocalDateTime proExpiredAt;
+
+    // 🔥 HÀM KIỂM TRA PRO (Chỉn chu, check cả ngày hết hạn)
+    public boolean isPro() {
+        if (this.accountType == AccountType.BASIC) {
+            return false;
+        }
+        // Nếu là PRO và (không có ngày hết hạn HOẶC ngày hết hạn vẫn ở trong tương lai)
+        return proExpiredAt == null || proExpiredAt.isAfter(LocalDateTime.now());
+    }
+
 }
